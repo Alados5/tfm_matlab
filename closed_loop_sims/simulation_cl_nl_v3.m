@@ -439,7 +439,41 @@ Rwd = -norm(wavg_lin_error_pos, 1);
 fprintf(['Reward: ', num2str(Rwd), '\n']);
 
 
-%% Errors
+%% KPI
+error_l = store_state(coord_nl([1,3,5]),:)'-phi_l_Traj(1:end,1:3);
+error_r = store_state(coord_nl([2,4,6]),:)'-phi_r_Traj(1:end,1:3);
+
+eMAE = mean(abs([error_l error_r]));
+eMSE = mean([error_l error_r].^2);
+eRMSE = sqrt(mean([error_l error_r].^2));
+
+eMAEp  = mean([norm(eMAE([1,3,5]),2) norm(eMAE([2,4,6]),2)]);
+eMSEp  = mean([norm(eMSE([1,3,5]),2) norm(eMSE([2,4,6]),2)]);
+eRMSEp = mean([norm(eRMSE([1,3,5]),2) norm(eRMSE([2,4,6]),2)]);
+eMAEm  = mean(eMAE,2); % Old "avg_error"
+eMSEm  = mean(eMSE,2);
+eRMSEm = mean(eRMSE,2);
+
+% Save on struct
+KPIs = struct();
+KPIs.eMAE = eMAE;
+KPIs.eMSE = eMSE;
+KPIs.eRMSE = eRMSE;
+KPIs.eMAEp = eMAEp;
+KPIs.eMSEp = eMSEp;
+KPIs.eRMSEp = eRMSEp;
+KPIs.eMAEm = eMAEm;
+KPIs.eMSEm = eMSEm;
+KPIs.eRMSEm = eRMSEm;
+
+% Display them
+fprintf('\nExecution KPIs:\n');
+fprintf(['- Coord. MAE:  \t', num2str(1000*eMAE),'\n']);
+fprintf(['- Coord. RMSE: \t', num2str(1000*eRMSE),'\n']);
+fprintf(['- Mean MAE:  \t', num2str(1000*eMAEm),' mm\n']);
+fprintf(['- Norm MAE:  \t', num2str(1000*eMAEp),' mm\n']);
+fprintf(['- Norm RMSE: \t', num2str(1000*eRMSEp),' mm\n']);
+
 avg_err_l = 1000*mean(abs(store_state(coord_nl([1,3,5]),:)'-phi_l_Traj(1:end,1:3)));
 avg_err_r = 1000*mean(abs(store_state(coord_nl([2,4,6]),:)'-phi_r_Traj(1:end,1:3)));
 avg_error = mean([avg_err_l avg_err_r]);

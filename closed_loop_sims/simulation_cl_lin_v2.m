@@ -16,8 +16,8 @@ plotAnim = 0;
 NTraj = 10;
 nCOM = 4;
 nSOM = 4;
-Hp = 30;
-Ts = 0.015;
+Hp = 25;
+Ts = 0.020;
 ExpSetN = 4;
 NExp = 8;
 NTrial = 2;
@@ -384,42 +384,87 @@ tT = toc(tT0);
 fprintf(['Total time: ',num2str(tT),' s \n']);
 
 
-%% Errors
-avg_err_l = 1000*mean(abs(store_state(coord_lcS([1,3,5]),:)'-phi_l_Traj(1:end,1:3)));
-avg_err_r = 1000*mean(abs(store_state(coord_lcS([2,4,6]),:)'-phi_r_Traj(1:end,1:3)));
-avg_error = mean([avg_err_l avg_err_r]);
+%% KPI
+error_l = store_state(coord_lcS([1,3,5]),:)'-phi_l_Traj(1:end,1:3);
+error_r = store_state(coord_lcS([2,4,6]),:)'-phi_r_Traj(1:end,1:3);
 
-display(avg_err_l);
-display(avg_err_r);
-display(avg_error);
+eMAE = mean(abs([error_l error_r]));
+eMSE = mean([error_l error_r].^2);
+eRMSE = sqrt(mean([error_l error_r].^2));
+
+eMAEp  = mean([norm(eMAE([1,3,5]),2) norm(eMAE([2,4,6]),2)]);
+eMSEp  = mean([norm(eMSE([1,3,5]),2) norm(eMSE([2,4,6]),2)]);
+eRMSEp = mean([norm(eRMSE([1,3,5]),2) norm(eRMSE([2,4,6]),2)]);
+eMAEm  = mean(eMAE,2); % Old "avg_error"
+eMSEm  = mean(eMSE,2);
+eRMSEm = mean(eRMSE,2);
+
+% Save on struct
+KPIs = struct();
+KPIs.eMAE = eMAE;
+KPIs.eMSE = eMSE;
+KPIs.eRMSE = eRMSE;
+KPIs.eMAEp = eMAEp;
+KPIs.eMSEp = eMSEp;
+KPIs.eRMSEp = eRMSEp;
+KPIs.eMAEm = eMAEm;
+KPIs.eMSEm = eMSEm;
+KPIs.eRMSEm = eRMSEm;
+
+% Display them
+fprintf('\nExecution KPIs:\n');
+fprintf(['- Coord. MAE:  \t', num2str(1000*eMAE),'\n']);
+fprintf(['- Coord. RMSE: \t', num2str(1000*eRMSE),'\n']);
+fprintf(['- Mean MAE:  \t', num2str(1000*eMAEm),' mm\n']);
+fprintf(['- Norm MAE:  \t', num2str(1000*eMAEp),' mm\n']);
+fprintf(['- Norm RMSE: \t', num2str(1000*eRMSEp),' mm\n']);
 
 
-%% PLOT LOWER CORNERS
+
+%% PLOT CORNERS
 time = 0:Ts:size(store_state,2)*Ts-Ts;
 
 fig1 = figure(1);
 fig1.Color = [1,1,1];
 
-subplot(7,2,1:2:12);
+subplot(15,2,1:2:12);
+plot(time,store_state(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
+title('\textbf{Left upper corner}', 'Interpreter', 'latex')
+grid on
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([0 time(end)])
+set(gca, 'TickLabelInterpreter', 'latex');
+
+subplot(15,2,2:2:12);
+plot(time,store_state(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
+title('\textbf{Right upper corner}', 'Interpreter', 'latex')
+grid on
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([0 time(end)])
+set(gca, 'TickLabelInterpreter', 'latex');
+
+subplot(15,2,17:2:28);
 plot(time,store_state(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time,phi_l_Traj, '--k', 'linewidth',1.2);
 hold off
 title('\textbf{Left lower corner}', 'Interpreter', 'latex')
 grid on
-xlabel('t [s]', 'Interpreter', 'latex')
+xlabel('Time [s]', 'Interpreter', 'latex')
 ylabel('Position [m]', 'Interpreter', 'latex')
 xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
-subplot(7,2,2:2:12);
+subplot(15,2,18:2:28);
 pa1som = plot(time,store_state(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time,phi_r_Traj, '--k', 'linewidth',1.2);
 hold off
 title('\textbf{Right lower corner}', 'Interpreter', 'latex')
 grid on
-xlabel('t [s]', 'Interpreter', 'latex')
+xlabel('Time [s]', 'Interpreter', 'latex')
 ylabel('Position [m]', 'Interpreter', 'latex')
 xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
@@ -428,42 +473,13 @@ Lgnd1 = legend([pa1som' pa1ref(1)], ...
                '$x_{SOM}$','$y_{SOM}$', '$z_{SOM}$', 'Ref', ...
                'Orientation','horizontal', 'Interpreter', 'latex');
 Lgnd1.Position(1) = 0.5-Lgnd1.Position(3)/2;
-Lgnd1.Position(2) = 0.06;
-
-
-%% PLOT UPPER CORNERS
-fig2 = figure(2);
-fig2.Color = [1,1,1];
-fig2.Position = fig1.Position + [300 0 0 0];
-
-subplot(7,2,1:2:12);
-plot(time,store_state(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
-title('\textbf{Left upper corner}', 'Interpreter', 'latex')
-grid on
-xlabel('t [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
-
-subplot(7,2,2:2:12);
-pa2som = plot(time,store_state(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
-title('\textbf{Right upper corner}', 'Interpreter', 'latex')
-grid on
-xlabel('t [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
-
-Lgnd2 = legend('$x_{SOM}$','$y_{SOM}$', '$z_{SOM}$', ...
-               'Orientation','horizontal', 'Interpreter', 'latex');
-Lgnd2.Position(1) = 0.5-Lgnd2.Position(3)/2;
-Lgnd2.Position(2) = 0.06;
+Lgnd1.Position(2) = 0.05;
 
 
 %% PLOT CLOTH MOVING
 fig3 = figure(3);
 fig3.Color = [1,1,1];
-fig3.Position = fig1.Position + [100 -200 100 100];
+fig3.Position = fig1.Position + [-200 0 0 0];
 
 pov = [-45 25];
 
