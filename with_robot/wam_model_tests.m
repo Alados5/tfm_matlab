@@ -1,26 +1,4 @@
-% WAM DH parameters
-d1 = 0;
-d3 = 0.55;
-d5 = 0.3;
-d7 = 0.09;
-
-DH = [0 d1  0     -pi/2;
-      0  0  0      pi/2;
-      0 d3  0.045 -pi/2;
-      0  0 -0.045  pi/2;
-      0 d5  0     -pi/2;
-      0  0  0      pi/2;
-      0 d7  0        0];
-
-% Create WAM Serial Link
-L(1) = Link([DH(1,:), 0]);
-L(2) = Link([DH(2,:), 0]);
-L(3) = Link([DH(3,:), 0]);
-L(4) = Link([DH(4,:), 0]);
-L(5) = Link([DH(5,:), 0]);
-L(6) = Link([DH(6,:), 0]);
-L(7) = Link([DH(7,:), 0]);
-wam = SerialLink(L, 'name', 'WAM [ALA]');
+init_WAM;
 
 q0 = [0 0 0 0 0 0 0];
 q1 = [-0.00252 0.54735, -0.04479, 1.42524, -0.03874, 0.89746, -0.00462];
@@ -36,11 +14,11 @@ qs =  wam.ikine(Ts, 'q0', q2);
 %qtraj = jtraj([0 0 0 0], qr, linspace(0,1,60));
 
 NTraj = 1;
-TrajL = load(['../data/trajectories/phi_',num2str(NTraj),'L.csv']);
-TrajR = load(['../data/trajectories/phi_',num2str(NTraj),'R.csv']);
+TrajL = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
+TrajR = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
 
 
-TrajM_15 = load('../data/results/MPCtraj.csv');
+TrajM_15 = load('./MPCtraj.csv');
 TrajM = TrajM_15(:,9:11);
 
 qt0 = qs;
