@@ -426,9 +426,11 @@ time = 0:Ts:size(store_state,2)*Ts-Ts;
 
 fig1 = figure(1);
 fig1.Color = [1,1,1];
+fig1.Position = [0.5 0 0.5 0.9];
+fig1.Color = [1,1,1];
 
 subplot(15,2,1:2:12);
-plot(time,store_state(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
+plot(time, store_state(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
 title('\textbf{Left upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -437,7 +439,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,2:2:12);
-plot(time,store_state(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
+plot(time, store_state(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
 title('\textbf{Right upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -446,9 +448,9 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,17:2:28);
-plot(time,store_state(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
+plot(time, store_state(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
 hold on
-plot(time,phi_l_Traj, '--k', 'linewidth',1.2);
+plot(time, phi_l_Traj, '--k', 'linewidth',1.2);
 hold off
 title('\textbf{Left lower corner}', 'Interpreter', 'latex')
 grid on
@@ -458,9 +460,9 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,18:2:28);
-pa1som = plot(time,store_state(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
+pa1som = plot(time, store_state(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
 hold on
-pa1ref = plot(time,phi_r_Traj, '--k', 'linewidth',1.2);
+pa1ref = plot(time, phi_r_Traj, '--k', 'linewidth',1.2);
 hold off
 title('\textbf{Right lower corner}', 'Interpreter', 'latex')
 grid on
@@ -479,11 +481,13 @@ Lgnd1.Position(2) = 0.05;
 %% PLOT CLOTH MOVING
 fig3 = figure(3);
 fig3.Color = [1,1,1];
-fig3.Position = fig1.Position + [-200 0 0 0];
+fig3.Units = 'normalized';
+fig3.Position = [0 0 0.5 0.90];
 
-pov = [-45 25];
+pov = [-30 20];
 
 SOM_ctrl = SOM.coord_ctrl(1:2);
+SOM_lowc = coord_nl(1:2);
 store_pos = store_state(1:3*SOMlength,:);
 All_uSOM = store_state(SOM.coord_ctrl,:);
 

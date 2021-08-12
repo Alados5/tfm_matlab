@@ -24,6 +24,7 @@ ExpSetN = 4;
 NExp = 8;
 NTrial = 2;
 zsum0 = 0*+0.002;
+TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
 xbound = 1;
@@ -32,6 +33,9 @@ gbound = 0;  % 0 -> Equality constraint
 W_Q = 1;
 W_T = 1;
 W_R = 10;
+
+% Noise parameters
+sigmaX = 0.05;
 
 % -------------------
 
@@ -260,16 +264,19 @@ cloth_z = cloth_z/norm(cloth_z);
 Rcloth = [cloth_x cloth_y cloth_z];
 Rtcp = [cloth_y cloth_x -cloth_z];
 
+% TCP initial position
+tcp_ini = (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2 + (Rcloth*TCPOffset_local)';
+
 % Initialize storage
 reference = zeros(6*COM.row*COM.col, Hp+1);
 store_state(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
-store_pose(1) = struct('position', (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2, ...
+store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
 
 tT0 = tic;
 t0 = tic;
-printX = 10;
+printX = 50;
 for tk=2:size(phi_l_Traj,1)
     
     % The last Hp timesteps, trajectory should remain constant
@@ -338,12 +345,15 @@ for tk=2:size(phi_l_Traj,1)
     Rtcp = [cloth_y cloth_x -cloth_z];
     
     % Real application with 1 robot: get EE pose
+    TCPOffset = Rcloth * TCPOffset_local;
     PoseTCP = struct();
-    PoseTCP.position = (u_SOM([1 3 5]) + u_SOM([2 4 6]))' / 2;
+    PoseTCP.position = (u_SOM([1 3 5]) + u_SOM([2 4 6]))' / 2 + TCPOffset';
     PoseTCP.orientation = rotm2quat(Rtcp);
     
     % Simulate a step of the SOM
-    [phi_ini_SOM, dphi_ini_SOM] = simulate_cloth_step(store_state(:,tk-1),u_SOM,SOM); 
+    x_noise = [normrnd(0,sigmaX^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_prev_noisy = store_state(:,tk-1) + x_noise;
+    [phi_ini_SOM, dphi_ini_SOM] = simulate_cloth_step(x_prev_noisy,u_SOM,SOM); 
       
     % Close the loop (update COM)
     [phired, dphired] = take_reduced_mesh(phi_ini_SOM,dphi_ini_SOM, nSOM, nCOM);
@@ -432,7 +442,7 @@ avg_lin_error_pos = avg_lin_error(1:3*COMlength);
 err_mask = kron([1 1 1]', (floor(nCOM-1/nCOM:-1/nCOM:0)'+1)/nCOM);
 wavg_lin_error_pos = avg_lin_error_pos.*err_mask.^2;
 
-% Final Reward
+% Final COM vs SOM Reward
 %Rwd = -norm(avg_lin_error_pos, 1);
 Rwd = -norm(wavg_lin_error_pos, 1);
 
@@ -538,67 +548,94 @@ fig3.Color = [1,1,1];
 fig3.Units = 'normalized';
 fig3.Position = [0 0 0.5 0.90];
 
-pov = [-40 20];
+pov = [-30 20];
 
 SOMlength = nxS*nyS;
 SOM_ctrl = SOM.coord_ctrl(1:2);
+SOM_lowc = coord_nl(1:2);
 store_pos = store_state(1:3*SOMlength,:);
+TCP_pos = reshape([store_pose.position],[3,size(phi_l_Traj,1)])';
 
 store_x = store_pos(1:SOMlength,:);
 limx = [floor(min(store_x(:))*10), ceil(max(store_x(:))*10)]/10;
 store_y = store_pos(SOMlength+1:2*SOMlength,:);
 limy = [floor(min(store_y(:))*10), ceil(max(store_y(:))*10)]/10;
 store_z = store_pos(2*SOMlength+1:3*SOMlength,:);
-limz = [floor(min(store_z(:))*10), ceil(max(store_z(:))*10)]/10;
+limz = [floor(min(store_z(:))*10), ceil(max(max(store_z(:)), max(TCP_pos(:,3)))*10)]/10;
 
-scatter3(store_x(:,1), store_y(:,1), store_z(:,1), '.b');
+plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)');
 hold on
-scatter3(store_x(SOM_ctrl,1), store_y(SOM_ctrl,1), ...
-         store_z(SOM_ctrl,1), 'om');
+plot3(store_x(SOM_lowc,:)', store_y(SOM_lowc,:)', store_z(SOM_lowc,:)');
 
-plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)', '--m');
+scatter3(TCP_pos(1,1), TCP_pos(1,2), TCP_pos(1,3), 'om', 'filled');
+plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
 plot3(phi_l_Traj(:,1),phi_l_Traj(:,2),phi_l_Traj(:,3), '--k');
 plot3(phi_r_Traj(:,1),phi_r_Traj(:,2),phi_r_Traj(:,3), '--k');
-plot3(store_x(coord_nl(1),:),store_y(coord_nl(1),:),store_z(coord_nl(1),:),'-r');
-plot3(store_x(coord_nl(2),:),store_y(coord_nl(2),:),store_z(coord_nl(2),:),'-r');
+
+scatter3(store_x(:,1), store_y(:,1), store_z(:,1), '.b');
 hold off
-axis equal; box on;
+axis equal; box on; grid on;
 xlim(limx);
 ylim(limy);
 zlim(limz);
 set(gca, 'TickLabelInterpreter','latex');
-xlabel('x', 'Interpreter','latex');
-ylabel('y', 'Interpreter','latex');
-zlabel('z', 'Interpreter','latex');
+xlabel('X', 'Interpreter','latex');
+ylabel('Y', 'Interpreter','latex');
+zlabel('Z', 'Interpreter','latex');
 fig3.Children.View = pov;
 
 if(plotAnim==1)
     %hold on;
+    pause(1);
     for t=2:size(store_state,2)
 
         scatter3(store_x(:,t), store_y(:,t), store_z(:,t), '.b');
         hold on
-        scatter3(store_x(SOM_ctrl,t), store_y(SOM_ctrl,t), ...
-                 store_z(SOM_ctrl,t), 'om');
-        
-        plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)', '--m');
+        scatter3(store_x(SOM_lowc,t), store_y(SOM_lowc,t), ...
+                 store_z(SOM_lowc,t), 'ob');
+        scatter3(TCP_pos(t,1), TCP_pos(t,2), TCP_pos(t,3), 'om', 'filled');
+                
+        plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
         plot3(phi_l_Traj(:,1),phi_l_Traj(:,2),phi_l_Traj(:,3), '--k');
         plot3(phi_r_Traj(:,1),phi_r_Traj(:,2),phi_r_Traj(:,3), '--k');
 
         hold off
-        axis equal; box on;
+        axis equal; box on; grid on;
         xlim(limx);
         ylim(limy);
         zlim(limz);
         set(gca, 'TickLabelInterpreter','latex');
-        xlabel('x', 'Interpreter','latex');
-        ylabel('y', 'Interpreter','latex');
-        zlabel('z', 'Interpreter','latex');
+        xlabel('X', 'Interpreter','latex');
+        ylabel('Y', 'Interpreter','latex');
+        zlabel('Z', 'Interpreter','latex');
         fig3.Children.View = pov;
 
         pause(1e-6);
     end
     %hold off
+    
+    plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)');
+    hold on
+    plot3(store_x(SOM_lowc,:)', store_y(SOM_lowc,:)', store_z(SOM_lowc,:)');
+
+    scatter3(TCP_pos(t,1), TCP_pos(t,2), TCP_pos(t,3), 'om', 'filled');
+    plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
+    plot3(phi_l_Traj(:,1),phi_l_Traj(:,2),phi_l_Traj(:,3), '--k');
+    plot3(phi_r_Traj(:,1),phi_r_Traj(:,2),phi_r_Traj(:,3), '--k');
+
+    scatter3(store_x(:,t), store_y(:,t), store_z(:,t), '.b');
+    hold off
+    axis equal; box on; grid on;
+    xlim(limx);
+    ylim(limy);
+    zlim(limz);
+    set(gca, 'TickLabelInterpreter','latex');
+    xlabel('X', 'Interpreter','latex');
+    ylabel('Y', 'Interpreter','latex');
+    zlabel('Z', 'Interpreter','latex');
+    fig3.Children.View = pov;
+
+    
 end
 
 
@@ -639,6 +676,8 @@ Lgnd4 = legend([pa4som(1), pa4com(1), pa4som(2), pa4com(2), pa4som(3), pa4com(3)
                'NumColumns',3, 'Interpreter', 'latex');
 Lgnd4.Position(1) = 0.5-Lgnd4.Position(3)/2;
 Lgnd4.Position(2) = 0.03;
+
+
 
 
 
