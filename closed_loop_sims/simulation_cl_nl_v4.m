@@ -13,6 +13,7 @@ addpath('..\required_files\casadi-toolbox')
 import casadi.*
 
 plotAnim = 0;
+animwWAM = 0;
 
 % General Parameters
 NTraj = 10;
@@ -542,26 +543,33 @@ Lgnd1.Position(1) = 0.5-Lgnd1.Position(3)/2;
 Lgnd1.Position(2) = 0.06;
 
 
-%% PLOT CLOTH MOVING
+%% PLOT SOM IN 3D (W/ CLOTH MOVING)
 fig3 = figure(3);
 fig3.Color = [1,1,1];
 fig3.Units = 'normalized';
 fig3.Position = [0 0 0.5 0.90];
 
 pov = [-30 20];
+wampov = [-50 30];
 
 SOMlength = nxS*nyS;
 SOM_ctrl = SOM.coord_ctrl(1:2);
 SOM_lowc = coord_nl(1:2);
 store_pos = store_state(1:3*SOMlength,:);
 TCP_pos = reshape([store_pose.position],[3,size(phi_l_Traj,1)])';
-
+TCP_q   = reshape([store_pose.orientation],[4,size(phi_l_Traj,1)])';
+TCP_rot = quat2rotm(TCP_q);
+TCP_Tm  = [TCP_rot permute(TCP_pos',[1,3,2]);
+          [0 0 0 1].*ones(1,1,size(phi_l_Traj,1))];
+      
 store_x = store_pos(1:SOMlength,:);
 limx = [floor(min(store_x(:))*10), ceil(max(store_x(:))*10)]/10;
 store_y = store_pos(SOMlength+1:2*SOMlength,:);
 limy = [floor(min(store_y(:))*10), ceil(max(store_y(:))*10)]/10;
 store_z = store_pos(2*SOMlength+1:3*SOMlength,:);
 limz = [floor(min(store_z(:))*10), ceil(max(max(store_z(:)), max(TCP_pos(:,3)))*10)]/10;
+
+wamws = [-0.4 0.4 -0.8 0.2 -0.4 0.8];
 
 plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)');
 hold on
@@ -582,10 +590,20 @@ set(gca, 'TickLabelInterpreter','latex');
 xlabel('X', 'Interpreter','latex');
 ylabel('Y', 'Interpreter','latex');
 zlabel('Z', 'Interpreter','latex');
-fig3.Children.View = pov;
+for fch=1:length(fig3.Children)
+    if isa(fig3.Children(fch),'matlab.graphics.axis.Axes')
+        fig3.Children(fch).View = pov;
+    end
+end
 
 if(plotAnim==1)
-    %hold on;
+    if (animwWAM > 0)
+        run("../with_robot/init_WAM.m");
+    
+        qini = wam.ikine(TCP_Tm(:,:,1), 'q0',qref);
+        qt = qini;
+    end
+
     pause(1);
     for t=2:size(store_state,2)
 
@@ -608,11 +626,33 @@ if(plotAnim==1)
         xlabel('X', 'Interpreter','latex');
         ylabel('Y', 'Interpreter','latex');
         zlabel('Z', 'Interpreter','latex');
-        fig3.Children.View = pov;
 
-        pause(1e-6);
+        if (animwWAM > 0)
+            WAMbaseC = [0.8 0.8 0.8];
+            hold on
+            fill3([-0.1 0.1 0.1 -0.1],[-0.1 -0.1 0.1 0.1],[0 0 0 0],WAMbaseC,'FaceAlpha',0.7)
+            fill3([-0.1 -0.1 -0.1 -0.1],[-0.1 -0.1 0.1 0.1],[-0.5 0 0 -0.5],WAMbaseC,'FaceAlpha',0.7)
+            fill3([-0.1 -0.1 0.1 0.1],[-0.1 -0.1 -0.1 -0.1],[-0.5 0 0 -0.5],WAMbaseC,'FaceAlpha',0.7)
+            fill3([0.1 0.1 0.1 0.1],[-0.1 -0.1 0.1 0.1],[-0.5 0 0 -0.5],WAMbaseC,'FaceAlpha',0.7)
+            fill3([-0.1 -0.1 0.1 0.1],[0.1 0.1 0.1 0.1],[-0.5 0 0 -0.5],WAMbaseC,'FaceAlpha',0.7)
+            hold off
+
+            qt = wam.ikine(TCP_Tm(:,:,t), 'q0',qt);
+            wam.plot(qt, 'workspace', wamws, ...
+                         'notiles', 'noshadow', 'nobase', ...
+                         'jointdiam', 0.6, 'jointlen', 0.8, ...
+                         'lightpos', [-0.5 -0.5 1], 'fps', 30, ...
+                         'linkcolor', [1 0.6 0], 'view', wampov, ...
+                         'jointcolor', [0.7 0 1], 'pjointcolor', [0.7 0 1]);
+        else
+            for fch=1:length(fig3.Children)
+                if isa(fig3.Children(fch),'matlab.graphics.axis.Axes')
+                    fig3.Children(fch).View = pov;
+                end
+            end
+            pause(1e-6);
+        end
     end
-    %hold off
     
     plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)');
     hold on
@@ -633,7 +673,11 @@ if(plotAnim==1)
     xlabel('X', 'Interpreter','latex');
     ylabel('Y', 'Interpreter','latex');
     zlabel('Z', 'Interpreter','latex');
-    fig3.Children.View = pov;
+    for fch=1:length(fig3.Children)
+        if isa(fig3.Children(fch),'matlab.graphics.axis.Axes')
+            fig3.Children(fch).View = pov;
+        end
+    end
 
     
 end

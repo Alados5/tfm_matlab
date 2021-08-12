@@ -246,6 +246,9 @@ TrajWAM(1,2:8) = qini;
 
 
 %% Plot
+fig1 = figure(1);
+fig1.Color = [1,1,1];
+
 plot3(TrajTCP(1,:), TrajTCP(2,:), TrajTCP(3,:))
 axis equal
 box on
@@ -259,8 +262,8 @@ xlabel('x','Interpreter','latex')
 ylabel('y','Interpreter','latex')
 zlabel('z','Interpreter','latex')
 
-wamws = [-0.4 0.4 -1 0.2 -0.4 0.6];
-pov = [-65 15];
+pov = [-50 30];
+wamws = [-0.4 0.4 -1 0.2 -0.2 0.6];
 wam.plot(qini, 'workspace', wamws, ...
                'notiles', 'noshadow', 'nobase', ...
                'jointdiam', 0.6, 'jointlen', 0.8, ...
