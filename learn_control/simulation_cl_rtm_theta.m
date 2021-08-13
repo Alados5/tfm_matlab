@@ -1,5 +1,6 @@
-function [Rwd, AllData] = simulation_cl_lin_theta(theta, opts)
+function [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts)
 
+addpath('..\required_files\cloth_model_New_NL\')
 addpath('..\required_files\cloth_model_New_L\')
 addpath('..\required_files\casadi-toolbox')
 import casadi.*
@@ -9,9 +10,11 @@ if nargin < 2
     NTraj = 6;
     Ts = 0.020;
     Hp = 25;
+    Wv = 0.2;
     sigmaX = 0;
     nCOM = 4;
     nSOM = 4;
+    nNLM = 10;
     paramsSOM = [-300 -10 -225  -4 -2.5 -4 0.03];
     paramsCOM = [-300 -10 -225  -4 -2.5 -4 0.03];
     xbound = 1.5;
@@ -19,9 +22,11 @@ else
     NTraj = opts.NTraj;
     Ts = opts.Ts;
     Hp = opts.Hp;
+    Wv = opts.Wv;
     sigmaX = opts.sigmaX;
     nCOM = opts.nCOM;
     nSOM = opts.nSOM;
+    nNLM = opts.nNLM;
     paramsSOM = opts.paramsSOM;
     paramsCOM = opts.paramsCOM;  
     xbound = opts.xbound;
@@ -47,11 +52,9 @@ cCloth = (phi_r_Traj(1,:) + phi_l_Traj(1,:))/2 + [0 0 lCloth/2];
 aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
 % Define COM parameters
-nxC = nCOM;
-nyC = nCOM;
 COM = struct;
-COM.row = nxC;
-COM.col = nyC;
+COM.row = nCOM;
+COM.col = nCOM;
 COM.mass = 0.1;
 COM.grav = 9.8;
 COM.dt = Ts;
@@ -63,18 +66,16 @@ COM.z_sum = paramsCOM(7);
 
 
 % Controlled coordinates (upper corners in x,y,z)
-COM_node_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
+COM_node_ctrl = [nCOM*(nCOM-1)+1, nCOM^2];
 COM.coord_ctrl = [COM_node_ctrl, ...
-                  COM_node_ctrl+nxC*nyC, ...
-                  COM_node_ctrl+2*nxC*nyC];
+                  COM_node_ctrl+nCOM^2, ...
+                  COM_node_ctrl+2*nCOM^2];
 
               
 % Define the SOM (LINEAR)
-nxS = nSOM;
-nyS = nSOM;
 SOM = struct;
-SOM.row = nxS;
-SOM.col = nyS;
+SOM.row = nSOM;
+SOM.col = nSOM;
 SOM.mass = 0.1;
 SOM.grav = 9.8;
 SOM.dt = Ts;
@@ -89,21 +90,21 @@ SOM.z_sum = paramsSOM(7);
 
 
 % Controlled coordinates (upper corners in x,y,z)
-SOM_node_ctrl = [nxS*(nyS-1)+1, nxS*nyS];
-SOM.coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+nxS*nyS SOM_node_ctrl+2*nxS*nyS];
+SOM_node_ctrl = [nSOM*(nSOM-1)+1, nSOM^2];
+SOM.coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+nSOM^2 SOM_node_ctrl+2*nSOM^2];
 
 % Define initial position of the nodes (needed for ext_force)
 % Second half is velocity (initial v=0)
-x_ini_SOM = [reshape(pos,[3*nxS*nyS 1]); zeros(3*nxS*nyS,1)];
+x_ini_SOM = [reshape(pos,[3*nSOM^2 1]); zeros(3*nSOM^2,1)];
 
 % Reduce initial SOM position to COM size if necessary
-[reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
-x_ini_COM = [reduced_pos; zeros(3*nxC*nyC,1)];
+[pos_rd,~] = take_reduced_mesh(x_ini_SOM(1:3*nSOM^2),x_ini_SOM(3*nSOM^2+1:6*nSOM^2), nSOM, nCOM);
+x_ini_COM = [pos_rd; zeros(3*nCOM^2,1)];
 
 % Rotate initial COM and SOM positions to XZ plane
 RCloth_ini = [cos(aCloth) -sin(aCloth) 0; sin(aCloth) cos(aCloth) 0; 0 0 1];
 posSOM_XZ = (RCloth_ini^-1 * pos')';
-posCOM = reshape(x_ini_COM(1:3*nxC*nyC), [nxC*nyC,3]);
+posCOM = reshape(x_ini_COM(1:3*nCOM^2), [nCOM^2,3]);
 posCOM_XZ = (RCloth_ini^-1 * posCOM')';
 
 % Initial position of the nodes
@@ -117,6 +118,17 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 % Find linear matrices
 [A_SOM, B_SOM, f_SOM] = create_model_linear_matrices(SOM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
+
+
+% Third model as a real cloth representation (NL)
+[NLM, pos_nl] = initialize_nl_model(lCloth,nNLM,cCloth,aCloth,Ts);
+x_ini_NLM = [reshape(pos_nl,[3*nNLM^2 1]); zeros(3*nNLM^2,1)];
+
+% Nonlinear model corner coordinates
+NLM_node_ctrl = [nNLM*(nNLM-1)+1, nNLM^2];
+NLM.coord_ctrl = [NLM_node_ctrl NLM_node_ctrl+nNLM^2 NLM_node_ctrl+2*nNLM^2];
+coord_lcNL = [1 nNLM 1+nNLM^2 nNLM^2+nNLM 2*nNLM^2+1 2*nNLM^2+nNLM]; 
+n_states_nl = 3*2*nNLM^2;
 
 
 %% Start casADi optimization problem
@@ -135,8 +147,8 @@ x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
 
 % Lower corner coordinates for both models
-coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
-coord_lcS = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
+coord_lcC = [1 nCOM 1+nCOM^2 nCOM^2+nCOM 2*nCOM^2+1 2*nCOM^2+nCOM]; 
+coord_lcS = [1 nSOM 1+nSOM^2 nSOM^2+nSOM 2*nSOM^2+1 2*nSOM^2+nSOM];
 
 % Parameters in the optimization problem: initial state and reference
 P = SX.sym('P',n_states,Hp+1); 
@@ -239,13 +251,24 @@ Rcloth = [cloth_x cloth_y cloth_z];
 
 % Initialize things
 reference = zeros(6*COM.row*COM.col, Hp+1);
-store_state(:,1) = x_ini_SOM;
+store_somstate(:,1) = x_ini_SOM;
+store_nlmstate(:,1) = x_ini_NLM;
 store_u(:,1) = zeros(6,1);
 
 tT0 = tic;
 t0 = tic;
 printX = floor(size(phi_l_Traj,1)/5);
 for tk=2:size(phi_l_Traj,1)
+    
+    % Get new feedback value (eq. to "Spin once")
+    x_noise_nl = [normrnd(0,sigmaX^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
+    x_prev_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl;
+    
+    [phi_noisy, dphi_noisy] = take_reduced_mesh(x_prev_noisy_nl(1:3*nNLM^2), ...
+                                      x_prev_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
+                                      nNLM, nSOM);
+    x_prev_noisy = [phi_noisy; dphi_noisy];
+    x_prev_wavg = x_prev_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
     
     % The last Hp timesteps, trajectory should remain constant
     if tk>=size(phi_l_Traj,1)-Hp 
@@ -257,13 +280,13 @@ for tk=2:size(phi_l_Traj,1)
     end
     
     % Rotate initial position to cloth base
-    pos_ini_COM = reshape(x_ini_COM(1:3*nxC*nyC),[nxC*nyC,3]);
-    vel_ini_COM = reshape(x_ini_COM(3*nxC*nyC+1:6*nxC*nyC),[nxC*nyC,3]);
+    pos_ini_COM = reshape(x_ini_COM(1:3*nCOM^2),[nCOM^2,3]);
+    vel_ini_COM = reshape(x_ini_COM(3*nCOM^2+1:6*nCOM^2),[nCOM^2,3]);
     
     pos_ini_COM_rot = (Rcloth^-1 * pos_ini_COM')';
     vel_ini_COM_rot = (Rcloth^-1 * vel_ini_COM')';
-    x_ini_COM_rot = [reshape(pos_ini_COM_rot,[3*nxC*nyC,1]);
-                     reshape(vel_ini_COM_rot,[3*nxC*nyC,1])];
+    x_ini_COM_rot = [reshape(pos_ini_COM_rot,[3*nCOM^2,1]);
+                     reshape(vel_ini_COM_rot,[3*nCOM^2,1])];
                  
     % Rotate reference trajectory to cloth base
     Traj_l_Hp_rot = (Rcloth^-1 * Traj_l_Hp')';
@@ -302,24 +325,24 @@ for tk=2:size(phi_l_Traj,1)
     u_bef = u_SOM;
     
     % Linear SOM uses local variables too (rot)
-    x_noise = [normrnd(0,sigmaX^2,[n_states/2,1]); zeros(n_states/2,1)];
-    x_prev_noisy = store_state(:,tk-1) + x_noise;
-    
-    pos_ini_SOM = reshape(x_prev_noisy(1:3*nxS*nyS), [nxS*nyS,3]);
-    vel_ini_SOM = reshape(x_prev_noisy(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
+    pos_ini_SOM = reshape(x_prev_wavg(1:3*nSOM^2), [nSOM^2,3]);
+    vel_ini_SOM = reshape(x_prev_wavg(3*nSOM^2+1:6*nSOM^2), [nSOM^2,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
     vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
-    x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
-                     reshape(vel_ini_SOM_rot,[3*nxS*nyS,1])];
+    x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nSOM^2,1]);
+                     reshape(vel_ini_SOM_rot,[3*nSOM^2,1])];
     
-    % Simulate a step
+    % Simulate a SOM step
     next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
     
+    % Simulate a NLM step
+    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_prev_noisy_nl,u_SOM,NLM); 
+    
     % Convert back to global axis
-    pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nxS*nyS), [nxS*nyS,3]);
-    vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nxS*nyS):6*nxS*nyS), [nxS*nyS,3]); 
-    pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nxS*nyS,1]);
-    vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
+    pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nSOM^2), [nSOM^2,3]);
+    vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nSOM^2):6*nSOM^2), [nSOM^2,3]); 
+    pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nSOM^2,1]);
+    vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nSOM^2,1]);
         
     % Close the loop
     [phired, dphired] = take_reduced_mesh(pos_nxt_SOM,vel_nxt_SOM, nSOM, nCOM);
@@ -336,12 +359,13 @@ for tk=2:size(phi_l_Traj,1)
     Rcloth = [cloth_x cloth_y cloth_z];
     
     % Store things
-    store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
+    store_somstate(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
+    store_nlmstate(:,tk) = [pos_nxt_NLM; vel_nxt_NLM];
     store_u(:,tk) = u_lin;
     
     if(mod(tk,printX)==0)
         t10 = toc(t0)*1000;
-        fprintf([' - Iter: ', num2str(tk), ...
+        fprintf(['Iter: ', num2str(tk), ...
             ' \t Avg. time/iter: ', num2str(t10/printX), ' ms \n']);
         t0 = tic;
     end
@@ -351,8 +375,13 @@ fprintf([' -- Total time: ',num2str(tT),' s \n']);
 
 
 %% KPI and Reward
-error_l = 1000*(store_state(coord_lcS([1,3,5]),:)'-phi_l_Traj);
-error_r = 1000*(store_state(coord_lcS([2,4,6]),:)'-phi_r_Traj);
+error_som_l = 1000*(store_nlmstate(coord_lcS([1,3,5]),:)'-phi_l_Traj);
+error_som_r = 1000*(store_nlmstate(coord_lcS([2,4,6]),:)'-phi_r_Traj);
+error_nlm_l = 1000*(store_nlmstate(coord_lcNL([1,3,5]),:)'-phi_l_Traj);
+error_nlm_r = 1000*(store_nlmstate(coord_lcNL([2,4,6]),:)'-phi_r_Traj);
+
+error_l = error_som_l;
+error_r = error_som_r;
 
 eMAE = mean(abs([error_l error_r]));
 eRMSE = sqrt(mean([error_l error_r].^2));
@@ -369,8 +398,9 @@ end
 
 %% SAVE DATA
 AllData = struct();
-AllData.xSOM = store_state;
-AllData.uSOM = store_state(SOM.coord_ctrl,:);
+AllData.xSOM = store_somstate;
+AllData.uSOM = store_somstate(SOM.coord_ctrl,:);
+AllData.xNLM = store_nlmstate;
 AllData.ulin = store_u;
 
 

@@ -1,17 +1,22 @@
 close all; clc; clear;
 
-ExpSet = '0_FirstTests';
+%% Initialization
+ExpSetN = 1;
+SimType = 'LIN'; %LIN, NL, RTM
+ExpSetNote = '';
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
+Wv = 0;
 sigmaX = 0.0;
 nSOM = 4;
 nCOM = 4;
+nNLM = 10;
 
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
-e0 = 5;
+e0 = 10;
 minRwd = -100;
 NSamples = 10;
 NEpochs = 5;
@@ -46,13 +51,14 @@ opts = struct();
 opts.NTraj = NTraj;
 opts.Ts = Ts;
 opts.Hp = Hp;
+opts.Wv = Wv;
 opts.sigmaX = sigmaX;
 opts.nSOM = nSOM;
 opts.nCOM = nCOM;
+opts.nNLM = nNLM;
 opts.paramsSOM = paramsSOM;
 opts.paramsCOM = paramsCOM;
 opts.xbound = 1.5;
-ExpSetN = str2double(ExpSet(1:strfind(ExpSet,'_')-1));
 % ----------
 
 % Parameters used in real robot and all previous sims
@@ -66,7 +72,8 @@ opts.W_R = 10;
 
 ThMask = [0.001 0.001 1 1 1]';
 ThW = 3:5;
-dirname = ['Exps',ExpSet,'/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
+dirname = ['Exps',num2str(ExpSetN), '_',SimType, ExpSetNote, ...
+           '/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
            '_hp',num2str(Hp), '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
 UseLambda = 1;
 if e0==0
@@ -90,6 +97,16 @@ else
     THprev = THans(:,:,end);
 end
 
+if strcmp(SimType, 'LIN')
+    SimTypeN = 0;
+elseif strcmp(SimType, 'NL')
+    SimTypeN = 1;
+elseif strcmp(SimType, 'RTM') || strcmp(SimType, 'RT')
+    SimTypeN = 2;
+else
+    error(['Simulation type "',SimType,'" is not a valid option.']);
+end
+
 NParams = length(mw0);
 
 MW = zeros(NParams,1,NEpochs+1);
@@ -101,6 +118,8 @@ XR = cell(1,NSamples,NEpochs);
 MW(:,:,1) = mw0;
 SW(:,:,1) = Sw0;
 
+
+%% Main Learning Loop
 mw = mw0;
 Sw = Sw0;
 epoch = 1;
@@ -131,7 +150,13 @@ while epoch <= NEpochs
         theta = thetai.*ThMask;
         fprintf([' Theta: [',num2str(theta',5),']\n']);
         
-        [Rwd, AllData] = simulation_cl_lin_theta(theta, opts);
+        if SimTypeN==2
+            [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts);
+        elseif SimTypeN==1
+            [Rwd, AllData] = simulation_cl_nl_theta(theta, opts);
+        else
+            [Rwd, AllData] = simulation_cl_lin_theta(theta, opts);
+        end
         Rwd = max(Rwd, minRwd);
 
         wghts_ep(:,i) = thetai;
@@ -188,9 +213,7 @@ save([dirname,'/RW_',epochrange,'.mat'],'RW');
 save([dirname,'/TH_',epochrange,'.mat'],'TH');
 
 
-
 %% Execution of mean weights of each epoch
-
 MW2D = permute(MW,[1,3,2]);
 RWMW = zeros(1, size(MW2D,2));
 
@@ -199,7 +222,13 @@ fprintf('\nExecuting resulting means per epoch...\n-----------------------');
 for epoch=1:size(MW2D,2)
     fprintf(['\nEpoch: ', num2str(e0+epoch-1), '\t|']);
     theta = (MW2D(:,epoch).*ThMask)';
-    [Rwd, AllSt] = simulation_cl_lin_theta(theta, opts);
+    if SimTypeN==2
+        [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts);
+    elseif SimTypeN==1
+        [Rwd, AllData] = simulation_cl_nl_theta(theta, opts);
+    else
+        [Rwd, AllData] = simulation_cl_lin_theta(theta, opts);
+    end
     RWMW(epoch) = Rwd;
 end
 ThLearnt = (MW2D(:,end).*ThMask)';
@@ -327,6 +356,7 @@ end
 ThetaCtrlLUT = readtable('ThetaControlLUT.csv');
 LUT_Exp_id = (ThetaCtrlLUT.ExpSetN == ExpSetN) & ...
              (ThetaCtrlLUT.NTraj == NTraj) & ...
+             (ThetaCtrlLUT.SimType == SimTypeN) & ...
              (ThetaCtrlLUT.Ts == Ts) & (ThetaCtrlLUT.Hp == Hp) & ...
              (ThetaCtrlLUT.nSOM == nSOM) & (ThetaCtrlLUT.nCOM == nCOM) & ...
              (ThetaCtrlLUT.NEpochs == NEpochs) & (ThetaCtrlLUT.NSamples == NSamples) & ...
@@ -348,6 +378,7 @@ else
     % Add experiment row
     LUT_row = size(ThetaCtrlLUT,1)+1;
     ThetaCtrlLUT(LUT_row,'ExpSetN') = {ExpSetN};
+    ThetaCtrlLUT(LUT_row,'SimType') = {SimTypeN};
     ThetaCtrlLUT(LUT_row,'NTraj') = {NTraj};
     ThetaCtrlLUT(LUT_row,'Ts') = {Ts};
     ThetaCtrlLUT(LUT_row,'Hp') = {Hp};
@@ -358,13 +389,11 @@ else
     ThetaCtrlLUT(LUT_row,'NSamples') = {NSamples};
     ThetaCtrlLUT(LUT_row,'MinRwd') = {minRwd};
     
-    ThetaCtrlLUT(LUT_row,'Th_stiffness_x') = {ThLearnt(1)};
-    ThetaCtrlLUT(LUT_row,'Th_stiffness_y') = {ThLearnt(2)};
-    ThetaCtrlLUT(LUT_row,'Th_stiffness_z') = {ThLearnt(3)};
-    ThetaCtrlLUT(LUT_row,'Th_damping_x') = {ThLearnt(4)};
-    ThetaCtrlLUT(LUT_row,'Th_damping_y') = {ThLearnt(5)};
-    ThetaCtrlLUT(LUT_row,'Th_damping_z') = {ThLearnt(6)};
-    ThetaCtrlLUT(LUT_row,'Th_z_sum') = {ThLearnt(7)};
+    ThetaCtrlLUT(LUT_row,'Th_ubound') = {ThLearnt(1)};
+    ThetaCtrlLUT(LUT_row,'Th_gbound') = {ThLearnt(2)};
+    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(3)};
+    ThetaCtrlLUT(LUT_row,'Th_WT') = {ThLearnt(4)};
+    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(5)};
 end
 writetable(ThetaCtrlLUT,'ThetaControlLUT.csv');
 fprintf('Updated ThetaControlLUT.csv\n');

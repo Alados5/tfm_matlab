@@ -148,10 +148,6 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 [NLM, pos_nl] = initialize_nl_model(lCloth,nNLM,cCloth,aCloth,Ts);
 x_ini_NLM = [reshape(pos_nl,[3*nNLM^2 1]); zeros(3*nNLM^2,1)];
 
-% Nonlinear model size = vision mesh size, must be reduced to SOM size
-[pos_rd_nl,~] = take_reduced_mesh(x_ini_NLM(1:3*nNLM^2),x_ini_NLM(3*nNLM^2+1:6*nNLM^2), nNLM, nSOM);
-x_ini_NLM_red = [pos_rd_nl; zeros(3*nSOM^2,1)];
-
 % Nonlinear model corner coordinates
 NLM_node_ctrl = [nNLM*(nNLM-1)+1, nNLM^2];
 NLM.coord_ctrl = [NLM_node_ctrl NLM_node_ctrl+nNLM^2 NLM_node_ctrl+2*nNLM^2];

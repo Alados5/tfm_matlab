@@ -1,6 +1,6 @@
 %{
 Closed-loop simulation of an MPC applied to a cloth model
-Original code by David Parent
+Original linear model by David Parent
 Modified by Adria Luque so both COM and SOM are linear models,
 as a first step to adapt the code into C++ to apply it to the real robot
 %}

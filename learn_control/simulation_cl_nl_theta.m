@@ -1,5 +1,6 @@
-function [Rwd, AllData] = simulation_cl_lin_theta(theta, opts)
+function [Rwd, AllData] = simulation_cl_nl_theta(theta, opts)
 
+addpath('..\required_files\cloth_model_New_NL\')
 addpath('..\required_files\cloth_model_New_L\')
 addpath('..\required_files\casadi-toolbox')
 import casadi.*
@@ -12,7 +13,6 @@ if nargin < 2
     sigmaX = 0;
     nCOM = 4;
     nSOM = 4;
-    paramsSOM = [-300 -10 -225  -4 -2.5 -4 0.03];
     paramsCOM = [-300 -10 -225  -4 -2.5 -4 0.03];
     xbound = 1.5;
 else
@@ -22,7 +22,6 @@ else
     sigmaX = opts.sigmaX;
     nCOM = opts.nCOM;
     nSOM = opts.nSOM;
-    paramsSOM = opts.paramsSOM;
     paramsCOM = opts.paramsCOM;  
     xbound = opts.xbound;
 end
@@ -69,28 +68,11 @@ COM.coord_ctrl = [COM_node_ctrl, ...
                   COM_node_ctrl+2*nxC*nyC];
 
               
-% Define the SOM (LINEAR)
+% Define the SOM (NONLINEAR)
 nxS = nSOM;
 nyS = nSOM;
-SOM = struct;
-SOM.row = nxS;
-SOM.col = nyS;
-SOM.mass = 0.1;
-SOM.grav = 9.8;
-SOM.dt = Ts;
+[SOM, pos] = initialize_nl_model(lCloth,nSOM,cCloth,aCloth,Ts);
 
-% Real initial position in space
-pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
-
-% Apply SOM parameters
-SOM.stiffness = paramsSOM(1:3);
-SOM.damping = paramsSOM(4:6);
-SOM.z_sum = paramsSOM(7);
-
-
-% Controlled coordinates (upper corners in x,y,z)
-SOM_node_ctrl = [nxS*(nyS-1)+1, nxS*nyS];
-SOM.coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+nxS*nyS SOM_node_ctrl+2*nxS*nyS];
 
 % Define initial position of the nodes (needed for ext_force)
 % Second half is velocity (initial v=0)
@@ -100,22 +82,18 @@ x_ini_SOM = [reshape(pos,[3*nxS*nyS 1]); zeros(3*nxS*nyS,1)];
 [reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
 x_ini_COM = [reduced_pos; zeros(3*nxC*nyC,1)];
 
-% Rotate initial COM and SOM positions to XZ plane
+% Rotate initial COM position to XZ plane
 RCloth_ini = [cos(aCloth) -sin(aCloth) 0; sin(aCloth) cos(aCloth) 0; 0 0 1];
-posSOM_XZ = (RCloth_ini^-1 * pos')';
 posCOM = reshape(x_ini_COM(1:3*nxC*nyC), [nxC*nyC,3]);
 posCOM_XZ = (RCloth_ini^-1 * posCOM')';
 
 % Initial position of the nodes
-SOM.nodeInitial = lift_z(posSOM_XZ, SOM);
 COM.nodeInitial = lift_z(posCOM_XZ, COM);
 
 % Find initial spring length in each direction x,y,z
-[SOM.mat_x, SOM.mat_y, SOM.mat_z] = compute_l0_linear(SOM,0);
 [COM.mat_x, COM.mat_y, COM.mat_z] = compute_l0_linear(COM,0);
 
 % Find linear matrices
-[A_SOM, B_SOM, f_SOM] = create_model_linear_matrices(SOM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
 
@@ -124,7 +102,7 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 phi = SX.sym('phi',3*COM.row*COM.col);
 dphi = SX.sym('dphi',3*COM.row*COM.col);
 x = [phi; dphi];
-n_states = length(x); % 3*2*nxC*nyC
+n_states = length(x); %should be 96 in a 4x4 model
 u = SX.sym('u',6);
 
 % Define model equations
@@ -135,8 +113,8 @@ x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
 
 % Lower corner coordinates for both models
-coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
-coord_lcS = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
+coord_l  = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
+coord_nl = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
 
 % Parameters in the optimization problem: initial state and reference
 P = SX.sym('P',n_states,Hp+1); 
@@ -155,11 +133,15 @@ Xk = P(:,1);
 
 % Weigths calculation (adaptive): direction pointing from the actual
 % lower corner position to the desired position at the end of the interval
-ln = P([1 3 5],end) - Xk(coord_lcC([1,3,5])); %ln = left node
+ln = P([1 3 5],end) - Xk(coord_l([1,3,5])); %ln = left node
 ln = abs(ln)./(norm(ln)+10^-6);
-rn = P([2,4,6],end) - Xk(coord_lcC([2,4,6])); %rn = right node
+rn = P([2,4,6],end) - Xk(coord_l([2,4,6])); %rn = right node
 rn = abs(rn)./(norm(rn)+10^-6);
 Q = diag([ln(1) rn(1) ln(2) rn(2) ln(3) rn(3)]);
+
+% Q = [xl xr yl yr zl zr]
+%Q = 0.5*diag([1 1 1 1 1 1]);
+
 
 take_x=[];
 take_u=[];
@@ -184,13 +166,13 @@ for k = 1:Hp
     %   (the COM is a spring which can be infinetely stretched in a step)
     lbw = [lbw; -ubound*ones(6,1)]; 
     ubw = [ubw;  ubound*ones(6,1)];
-    
+
     take_u=[take_u;(i:(i+6-1))'];
     i=i+6;
     
     % Integrate until the end of the interval
     Xk_next = stfun(Xk,Uk);
-    Xkn_r = Xk_next(coord_lcC);
+    Xkn_r = Xk_next(coord_l);
     
     % Constant distance between upper corners
     Xkn_u = Xk_next(COM.coord_ctrl);
@@ -215,6 +197,8 @@ nlp_prob = struct('f', obj, 'x', w, 'g', g, 'p', P);
 opts = struct;
 opts.print_time = 0;
 opts.ipopt.print_level = 0; %0 to print the minimum, 3 to print the maximum
+opts.ipopt.warm_start_init_point = 'yes'; %warm start
+
 solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 
 
@@ -227,7 +211,7 @@ u_ini = x_ini_SOM(SOM.coord_ctrl);
 u_bef = u_ini;
 u_SOM = u_ini;
 
-% Get Cloth orientation (rotation matrix)
+% Get initial Cloth orientation (rotation matrix)
 cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
 cloth_y = [-cloth_x(2) cloth_x(1) 0]';
 cloth_z = cross(cloth_x,cloth_y);
@@ -237,7 +221,7 @@ cloth_y = cloth_y/norm(cloth_y);
 cloth_z = cloth_z/norm(cloth_z);
 Rcloth = [cloth_x cloth_y cloth_z];
 
-% Initialize things
+% Initialize storage
 reference = zeros(6*COM.row*COM.col, Hp+1);
 store_state(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
@@ -269,7 +253,7 @@ for tk=2:size(phi_l_Traj,1)
     Traj_l_Hp_rot = (Rcloth^-1 * Traj_l_Hp')';
     Traj_r_Hp_rot = (Rcloth^-1 * Traj_r_Hp')';
     
-    % Define reference in the prediction horizon (sliding window)
+    % Define reference in the prediction horizon (moving window)
     reference(:,1) = x_ini_COM_rot;
     reference(1,2:end) = Traj_l_Hp_rot(:,1)';
     reference(2,2:end) = Traj_r_Hp_rot(:,1)';
@@ -297,33 +281,9 @@ for tk=2:size(phi_l_Traj,1)
     u_lin2 = Rcloth * u_rot2;
     u_lin = reshape(u_lin2',[6,1]);
     
-    % Output for Cartesian Ctrl is still u_SOM
-    u_SOM = u_lin+u_bef;
+    % Add previous position for absolute position
+    u_SOM = u_lin + u_bef;
     u_bef = u_SOM;
-    
-    % Linear SOM uses local variables too (rot)
-    x_noise = [normrnd(0,sigmaX^2,[n_states/2,1]); zeros(n_states/2,1)];
-    x_prev_noisy = store_state(:,tk-1) + x_noise;
-    
-    pos_ini_SOM = reshape(x_prev_noisy(1:3*nxS*nyS), [nxS*nyS,3]);
-    vel_ini_SOM = reshape(x_prev_noisy(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
-    pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
-    vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
-    x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
-                     reshape(vel_ini_SOM_rot,[3*nxS*nyS,1])];
-    
-    % Simulate a step
-    next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
-    
-    % Convert back to global axis
-    pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nxS*nyS), [nxS*nyS,3]);
-    vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nxS*nyS):6*nxS*nyS), [nxS*nyS,3]); 
-    pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nxS*nyS,1]);
-    vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
-        
-    % Close the loop
-    [phired, dphired] = take_reduced_mesh(pos_nxt_SOM,vel_nxt_SOM, nSOM, nCOM);
-    x_ini_COM = [phired; dphired];
     
     % Get new Cloth orientation (rotation matrix)
     cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
@@ -335,13 +295,23 @@ for tk=2:size(phi_l_Traj,1)
     cloth_z = cloth_z/norm(cloth_z);
     Rcloth = [cloth_x cloth_y cloth_z];
     
+    % Simulate a step of the SOM
+    x_noise = [normrnd(0,sigmaX^2,[3*nSOM^2,1]); zeros(3*nSOM^2,1)];
+    x_prev_noisy = store_state(:,tk-1) + x_noise;
+    [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_prev_noisy,u_SOM,SOM); 
+    
+    % Close the loop (update COM)
+    [phired, dphired] = take_reduced_mesh(pos_nxt_SOM,vel_nxt_SOM, nSOM, nCOM);
+    x_ini_COM = [phired; dphired];
+    
     % Store things
     store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
     store_u(:,tk) = u_lin;
     
+    % Display progress
     if(mod(tk,printX)==0)
         t10 = toc(t0)*1000;
-        fprintf([' - Iter: ', num2str(tk), ...
+        fprintf(['Iter: ', num2str(tk), ...
             ' \t Avg. time/iter: ', num2str(t10/printX), ' ms \n']);
         t0 = tic;
     end
@@ -351,8 +321,8 @@ fprintf([' -- Total time: ',num2str(tT),' s \n']);
 
 
 %% KPI and Reward
-error_l = 1000*(store_state(coord_lcS([1,3,5]),:)'-phi_l_Traj);
-error_r = 1000*(store_state(coord_lcS([2,4,6]),:)'-phi_r_Traj);
+error_l = 1000*(store_state(coord_nl([1,3,5]),:)'-phi_l_Traj);
+error_r = 1000*(store_state(coord_nl([2,4,6]),:)'-phi_r_Traj);
 
 eMAE = mean(abs([error_l error_r]));
 eRMSE = sqrt(mean([error_l error_r].^2));
