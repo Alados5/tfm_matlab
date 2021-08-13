@@ -1,96 +1,78 @@
 close all; clc; clear;
 
-ExpSet = '0_Tests';
-ExpDate = '2021_08_11';
-NExp = 1;
-NTrial = 1;
-SimType = 'CL';
-minRwd = -1000;
-SizeSOM = 10;
-SizeCOM = 4;
-Ts = 0.015;
-e0 = 20;
+ExpSet = '0_FirstTests';
+NTraj = 6;
+Ts = 0.020;
+Hp = 25;
+sigmaX = 0.0;
+nSOM = 4;
+nCOM = 4;
 
-NSamples = 50;
-NEpochs = 20;
+SOM_ThetaExp = [4,8,2];
+COM_ThetaExp = [4,8,2];
+
+e0 = 5;
+minRwd = -100;
+NSamples = 10;
+NEpochs = 5;
 
 Plot3DTraj = 0;
 Plot2DTraj = 1;
 
-% OL Options
+% Load parameter table and select corresponding row
+ThetaModelLUT = readtable('./ThetaModelLUT.csv');
+LUT_SOM_id = (ThetaModelLUT.ExpSetN == SOM_ThetaExp(1)) & ...
+             (ThetaModelLUT.NExp == SOM_ThetaExp(2)) & ...
+             (ThetaModelLUT.NTrial == SOM_ThetaExp(3)) & ... 
+             (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.nCOM == nSOM);
+LUT_COM_id = (ThetaModelLUT.ExpSetN == COM_ThetaExp(1)) & ...
+             (ThetaModelLUT.NExp == COM_ThetaExp(2)) & ...
+             (ThetaModelLUT.NTrial == COM_ThetaExp(3)) & ...
+             (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.nCOM == nCOM);
+LUT_SOM = ThetaModelLUT(LUT_COM_id, :);
+LUT_COM = ThetaModelLUT(LUT_COM_id, :);
+if (size(LUT_COM,1) > 1 || size(LUT_SOM,1) > 1)
+    error("There are multiple rows with same experiment parameters.");
+elseif (size(LUT_COM,1) < 1 || size(LUT_SOM,1) < 1)
+    error("There are no saved experiments with those parameters.");
+else
+    paramsSOM = table2array(LUT_SOM(:, contains(LUT_SOM.Properties.VariableNames, 'Th_')));
+    paramsCOM = table2array(LUT_COM(:, contains(LUT_COM.Properties.VariableNames, 'Th_')));
+end
+
+
+% Options
 opts = struct();
-opts.nCOM = SizeCOM;
+opts.NTraj = NTraj;
 opts.Ts = Ts;
-opts.ExpSetN = str2double(ExpSet(1:strfind(ExpSet,'_')-1));
-opts.NExp = NExp;
-opts.NTrial = NTrial;
-% NL SOM Model options
-opts.nSOM = SizeSOM;
-% Real Data options
-opts.ExpDate = ExpDate;
-% CL Options
-opts.Hp = 30;
-opts.NTraj = 3;
-opts.xbound = 1;
+opts.Hp = Hp;
+opts.sigmaX = sigmaX;
+opts.nSOM = nSOM;
+opts.nCOM = nCOM;
+opts.paramsSOM = paramsSOM;
+opts.paramsCOM = paramsCOM;
+opts.xbound = 1.5;
+ExpSetN = str2double(ExpSet(1:strfind(ExpSet,'_')-1));
+% ----------
+
+% Parameters used in real robot and all previous sims
+%{
 opts.ubound = 5*1e-3;
-opts.gbound = 0;  % 0 -> Equality constraint
+opts.gbound = 0*1e-3;  % 0 -> Equality constraint
 opts.W_Q = 1;
 opts.W_T = 1;
 opts.W_R = 10;
-% ----------
-
-
-%{
-% Original optimized for a 4x4
-theta.stiffness = [-305.6028  -13.4221 -225.8987]; 
-theta.damping = [-4.0042   -2.5735   -3.9090]; 
-theta.z_sum = 0.0312;
 %}
 
-
-ThMask = [100 100 100 1 1 1 0.01]';
-dirname = ['Exps',ExpSet,'/Exp',num2str(NExp),'_',num2str(NTrial),'_',num2str(Ts*1000),'ms'];
+ThMask = [0.001 0.001 1 1 1]';
+ThW = 3:5;
+dirname = ['Exps',ExpSet,'/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
+           '_hp',num2str(Hp), '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
 UseLambda = 1;
 if e0==0
-    % Initial seed for different sample times
-    if (SizeCOM == 4 && Ts == 0.010)
-        mw0 = [-2.5; -2.5; -2.5;    -4; -4; -4;   3];
-        Sw0 = diag([0.5; 0.5; 0.5;   1; 1; 1;    1]);
-        
-    elseif (SizeCOM == 4 && Ts == 0.015)
-        mw0 = [-2.0; -1.5; -2.0;     -3; -2.5; -3;     4];
-        Sw0 = diag([0.3; 0.3; 0.3;   0.2; 0.2; 0.2;    1]);
-    
-    elseif (SizeCOM == 4 && Ts == 0.020)
-    	mw0 = [-1.0; -0.5; -1.0;     -2; -1; -2;       8];
-    	Sw0 = diag([0.3; 0.3; 0.3;   0.2; 0.2; 0.2;    1]);
-        
-    elseif (SizeCOM == 4 && Ts == 0.025)
-    	mw0 = [-0.5; -0.15; -0.5;     -1.7; -0.6; -1.7;    12];
-    	Sw0 = diag([0.04; 0.04; 0.04;  0.08; 0.08; 0.08;   0.5]);
-        
-    elseif (SizeCOM == 7 && Ts == 0.010)
-        % Used for S5 10_1
-        %mw0 = [-1.2 -0.98 -1.8    -3.1 -2.9 -3.2  16]';
-        %Sw0 = diag([0.1; 0.1; 0.1;   0.05; 0.05; 0.05;     2]);
-        % Used for the rest
-        mw0 = [-1.5; -1.0; -1.5;    -3.0; -2.5; -3.0;  20];
-        Sw0 = diag([0.5; 0.5; 0.5;   0.5; 0.5; 0.5;     2]);
-        
-    elseif (SizeCOM == 7 && Ts == 0.015)
-        mw0 = [-1.5; -1.0; -1.5;    -2.5; -2.0; -2.5;  15];
-        Sw0 = diag([0.2; 0.2; 0.2;   0.1; 0.1; 0.1;     1]);
-    
-    elseif (SizeCOM == 7 && Ts == 0.020)
-        mw0 = [-1.1; -0.7; -1.0;       -2.4; -1.8; -2.4;     25];
-        Sw0 = diag([0.08; 0.08; 0.08;   0.07; 0.07; 0.07;     1]);
-    
-    elseif (SizeCOM == 7 && Ts == 0.025)
-        mw0 = [-0.60; -0.50; -0.70;     -1.7; -1.35; -1.9;   40];
-        Sw0 = diag([0.02; 0.02; 0.02;   0.01; 0.01; 0.01;     1]);
-        UseLambda = 0;
-        
-    end
+    % Initial seed [xbound; ubound; gbound; WQ; WT; WR]
+    mw0 = [5; 0;          0.5; 0.5; 0.5];
+    Sw0 = diag([2; 0.1;   0.5; 0.5; 0.5]);
 else
     prevrange = [num2str(e0-NEpochs),'-',num2str(e0)];
 
@@ -138,26 +120,23 @@ while epoch <= NEpochs
         %SwL(7,7) = Sw(7,7)*1.1;
         
         thetai = mvnrnd(mw, SwL)';
-        while any(thetai(1:6)>0) || thetai(7) < 0
+        th_maxW = max(thetai(ThW));
+        thetai(ThW) = thetai(ThW)/th_maxW;
+        while any(thetai<0) || any(thetai(ThW)>1) || all(thetai(ThW)==0)
             thetai = mvnrnd(mw, SwL)';
+            th_maxW = max(thetai(ThW));
+            thetai(ThW) = thetai(ThW)/th_maxW;
         end
 
-        theta = struct();
-        theta.stiffness = thetai(1:3)'*100;
-        theta.damping = thetai(4:6)';
-        theta.z_sum = thetai(7)/100;
-
-        fprintf([' Theta: [',num2str(thetai'.*ThMask',5),']\n']);
+        theta = thetai.*ThMask;
+        fprintf([' Theta: [',num2str(theta',5),']\n']);
         
-        [Rwd, AllSt] = simulation_ol_theta_v3(theta, opts);
-        %[Rwd, AllSt] = simulation_ol_theta_v2(theta, opts);
-        %[Rwd, AllSt] = simulation_ol_theta_v1(theta, opts);
-        %[Rwd, AllSt] = simulation_cl_theta(theta, opts);
+        [Rwd, AllData] = simulation_cl_lin_theta(theta, opts);
         Rwd = max(Rwd, minRwd);
 
         wghts_ep(:,i) = thetai;
         rwrds_ep(i) = Rwd;
-        XR{1,i,epoch} = AllSt;
+        XR{1,i,epoch} = AllData;
     end
     
     if isequal(unique(rwrds_ep), minRwd)
@@ -179,6 +158,7 @@ while epoch <= NEpochs
         
         Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
         mw = sum(bsxfun(@times, weights2', dw),1)'./sum(dw);
+        mw(ThW) = mw(ThW)/max(mw(ThW));
         summ = 0;
         for ak = 1:size(weights2,2)
             summ = summ + dw(ak)*((weights2(:,ak)-mw)*(weights2(:,ak)-mw)');%/sum(dw);
@@ -194,16 +174,6 @@ while epoch <= NEpochs
     end
 
 end
-
-%{
-- Matrix of SOM states: All_StV
-- Matrix of reduced SOM states: All_StVrd
-- Matrix of SOM control actions: All_uSOM
-- Matrix of linear control actions: All_ulin
-- Matrix of simulated COM states: All_StC
-- Reward: Rwd
-%}
-
 
 % Save data
 if ~isfolder(dirname)
@@ -228,18 +198,8 @@ fprintf('\nExecuting resulting means per epoch...\n-----------------------');
 
 for epoch=1:size(MW2D,2)
     fprintf(['\nEpoch: ', num2str(e0+epoch-1), '\t|']);
-    
-    MW2D_Thi = (MW2D(:,epoch).*ThMask)';
-    
-    theta = struct();
-    theta.stiffness = MW2D_Thi(1:3);
-    theta.damping = MW2D_Thi(4:6);
-    theta.z_sum = MW2D_Thi(7);
-    
-    [Rwd, AllSt] = simulation_ol_theta_v3(theta, opts);
-    %[Rwd, AllSt] = simulation_ol_theta_v2(theta, opts);
-    %[Rwd, AllSt] = simulation_ol_theta_v1(theta, opts);
-    %[Rwd, AllSt] = simulation_cl_theta(theta, opts);
+    theta = (MW2D(:,epoch).*ThMask)';
+    [Rwd, AllSt] = simulation_cl_lin_theta(theta, opts);
     RWMW(epoch) = Rwd;
 end
 ThLearnt = (MW2D(:,end).*ThMask)';
@@ -298,7 +258,7 @@ end
 
 
 %% 3D & 2D Plots
-tSim = 0:Ts:size(AllSt.SOM,2)*Ts-Ts;
+tSim = 0:Ts:size(AllData.xSOM,2)*Ts-Ts;
 SOM_node_ctrl = [opts.nSOM*(opts.nSOM-1)+1, opts.nSOM*opts.nSOM];
 SOM_coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+opts.nSOM^2 SOM_node_ctrl+2*opts.nSOM^2];
 COM_node_ctrl = [opts.nCOM*(opts.nCOM-1)+1, opts.nCOM*opts.nCOM];
@@ -306,24 +266,23 @@ COM_coord_ctrl = [COM_node_ctrl, COM_node_ctrl+opts.nCOM^2, COM_node_ctrl+2*opts
 coord_l  = [1 opts.nCOM 1+opts.nCOM^2 opts.nCOM^2+opts.nCOM 2*opts.nCOM^2+1 2*opts.nCOM^2+opts.nCOM]; 
 coord_nl = [1 opts.nSOM 1+opts.nSOM^2 opts.nSOM^2+opts.nSOM 2*opts.nSOM^2+1 2*opts.nSOM^2+opts.nSOM];
 
+refL = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
+refR = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
 
 % 3D trajectories (uc & lc)
 if(Plot3DTraj==1)
     hf3 = figure(3);
     hf3.Color = [1,1,1];
 
-    plot3(AllSt.SOM(SOM_coord_ctrl(1),:), AllSt.SOM(SOM_coord_ctrl(3),:), AllSt.SOM(SOM_coord_ctrl(5),:))
+    plot3(AllData.xSOM(SOM_coord_ctrl(1:2),:)', AllData.xSOM(SOM_coord_ctrl(3:4),:)', AllData.xSOM(SOM_coord_ctrl(5:6),:)');
     hold on
-    box on; grid on;
-    plot3(AllSt.SOM(SOM_coord_ctrl(2),:), AllSt.SOM(SOM_coord_ctrl(4),:), AllSt.SOM(SOM_coord_ctrl(6),:))
-    plot3(AllSt.COM(COM_coord_ctrl(1),:), AllSt.COM(COM_coord_ctrl(3),:), AllSt.COM(COM_coord_ctrl(5),:), '--')
-    plot3(AllSt.COM(COM_coord_ctrl(2),:), AllSt.COM(COM_coord_ctrl(4),:), AllSt.COM(COM_coord_ctrl(6),:), '--')
-    plot3(AllSt.SOM(coord_nl(1),:), AllSt.SOM(coord_nl(3),:), AllSt.SOM(coord_nl(5),:))
-    plot3(AllSt.SOM(coord_nl(2),:), AllSt.SOM(coord_nl(4),:), AllSt.SOM(coord_nl(6),:))
-    plot3(AllSt.COM(coord_l(1),:), AllSt.COM(coord_l(3),:), AllSt.COM(coord_l(5),:), '--')
-    plot3(AllSt.COM(coord_l(2),:), AllSt.COM(coord_l(4),:), AllSt.COM(coord_l(6),:), '--')
+    plot3(AllData.xSOM(coord_nl(1:2),:)', AllData.xSOM(coord_nl(3:4),:)', AllData.xSOM(coord_nl(5:6),:)');
+    plot3(refL(:,1), refL(:,2), refL(:,3), '--k', 'linewidth',1);
+    plot3(refR(:,1), refR(:,2), refR(:,3), '--k', 'linewidth',1);
     hold off
+    box on; grid on;
     axis equal
+    set(gca,'TickLabelInterpreter','latex');
 end
 
 % 2D evolutions
@@ -332,18 +291,18 @@ if(Plot2DTraj==1)
     hf4.Color = [1,1,1];
 
     subplot(10,2,1:2:18);
-    plot(tSim, AllSt.SOM(coord_nl([1,3,5]),:));
+    plot(tSim, AllData.xSOM(coord_nl([1,3,5]),:), 'linewidth',1.5);
     hold on
-    plot(tSim, AllSt.COM(coord_l([1,3,5]),:), '--')
+    plot(tSim, refL, '--k', 'linewidth',1);
     hold off
     grid on
     set(gca,'TickLabelInterpreter','latex');
     ylim41 = ylim;
 
     subplot(10,2,2:2:18);
-    pa4som = plot(tSim, AllSt.SOM(coord_nl([2,4,6]),:));
+    pa4som = plot(tSim, AllData.xSOM(coord_nl([2,4,6]),:), 'linewidth',1.5);
     hold on
-    pa4com = plot(tSim, AllSt.COM(coord_l([2,4,6]),:), '--');
+    pa4ref = plot(tSim, refR, '--k', 'linewidth',1);
     hold off
     grid on
     set(gca,'TickLabelInterpreter','latex');
@@ -355,68 +314,58 @@ if(Plot2DTraj==1)
     subplot(10,2,2:2:18);
     ylim(ylim4);
 
-    Lgnd4 = legend([pa4som(1), pa4com(1), pa4som(2), pa4com(2), pa4som(3), pa4com(3)], ...
-                   '$x_{SOM}$','$x_{COM}$','$y_{SOM}$', ...
-                   '$y_{COM}$','$z_{SOM}$','$z_{COM}$', ...
-                   'NumColumns',3, 'Interpreter', 'latex');
+    Lgnd4 = legend([pa4som; pa4ref(1)], ...
+                   '$x_{SOM}$','$y_{SOM}$','$z_{SOM}$', 'Ref', ...
+                   'Orientation', 'horizontal', 'Interpreter', 'latex');
     Lgnd4.Position(1) = 0.5-Lgnd4.Position(3)/2;
-    Lgnd4.Position(2) = 0.04;
+    Lgnd4.Position(2) = 0.05;
 
 end
 
 
 %% Update LUT for Parameters
-ThetaLUT = readtable('ThetaModelLUT.csv');
-LUT_Exp_id = (categorical(ThetaLUT.ExpSetName) == ExpSet) & ...
-             (ThetaLUT.NExp == NExp) & (ThetaLUT.NTrial == NTrial) & ...
-             (ThetaLUT.Ts == Ts) & (ThetaLUT.NEpochs == NEpochs) & ...
-             (ThetaLUT.NSamples == NSamples) & (ThetaLUT.MinRwd == minRwd) & ...
-             (categorical(ThetaLUT.Simulation) == SimType);
-LUT_Exp = ThetaLUT(LUT_Exp_id, :);
+ThetaCtrlLUT = readtable('ThetaControlLUT.csv');
+LUT_Exp_id = (ThetaCtrlLUT.ExpSetN == ExpSetN) & ...
+             (ThetaCtrlLUT.NTraj == NTraj) & ...
+             (ThetaCtrlLUT.Ts == Ts) & (ThetaCtrlLUT.Hp == Hp) & ...
+             (ThetaCtrlLUT.nSOM == nSOM) & (ThetaCtrlLUT.nCOM == nCOM) & ...
+             (ThetaCtrlLUT.NEpochs == NEpochs) & (ThetaCtrlLUT.NSamples == NSamples) & ...
+             (ThetaCtrlLUT.MinRwd == minRwd);
+LUT_Exp = ThetaCtrlLUT(LUT_Exp_id, :);
 
 if (size(LUT_Exp,1) > 1)
     error("There are multiple rows with same experiment parameters.");
 elseif (size(LUT_Exp,1) == 1)
     % Update experiment row
     LUT_row = find(LUT_Exp_id);
-    ThetaLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
-    ThetaLUT(LUT_row,'Th_stiffness_x') = {ThLearnt(1)};
-    ThetaLUT(LUT_row,'Th_stiffness_y') = {ThLearnt(2)};
-    ThetaLUT(LUT_row,'Th_stiffness_z') = {ThLearnt(3)};
-    ThetaLUT(LUT_row,'Th_damping_x') = {ThLearnt(4)};
-    ThetaLUT(LUT_row,'Th_damping_y') = {ThLearnt(5)};
-    ThetaLUT(LUT_row,'Th_damping_z') = {ThLearnt(6)};
-    ThetaLUT(LUT_row,'Th_z_sum') = {ThLearnt(7)};
+    ThetaCtrlLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
+    ThetaCtrlLUT(LUT_row,'Th_ubound') = {ThLearnt(1)};
+    ThetaCtrlLUT(LUT_row,'Th_gbound') = {ThLearnt(2)};
+    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(3)};
+    ThetaCtrlLUT(LUT_row,'Th_WT') = {ThLearnt(4)};
+    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(5)};
 else
     % Add experiment row
-    LUT_row = size(ThetaLUT,1)+1;
-    ThetaLUT(LUT_row,'ExpSetN') = {str2double(ExpSet(1))};
-    ThetaLUT(LUT_row,'ExpSetName') = {ExpSet};
-    ThetaLUT(LUT_row,'ExpDate') = {ExpDate};
-    ThetaLUT(LUT_row,'NExp') = {NExp};
-    ThetaLUT(LUT_row,'NTrial') = {NTrial};
-    ThetaLUT(LUT_row,'Ts') = {Ts};
-    ThetaLUT(LUT_row,'nSOM') = {SizeSOM};
-    ThetaLUT(LUT_row,'nCOM') = {SizeCOM};
-    ThetaLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
-    ThetaLUT(LUT_row,'NEpochs') = {NEpochs};
-    ThetaLUT(LUT_row,'NSamples') = {NSamples};
-    ThetaLUT(LUT_row,'Simulation') = {SimType};
-    ThetaLUT(LUT_row,'MinRwd') = {minRwd};
+    LUT_row = size(ThetaCtrlLUT,1)+1;
+    ThetaCtrlLUT(LUT_row,'ExpSetN') = {ExpSetN};
+    ThetaCtrlLUT(LUT_row,'NTraj') = {NTraj};
+    ThetaCtrlLUT(LUT_row,'Ts') = {Ts};
+    ThetaCtrlLUT(LUT_row,'Hp') = {Hp};
+    ThetaCtrlLUT(LUT_row,'nSOM') = {nSOM};
+    ThetaCtrlLUT(LUT_row,'nCOM') = {nCOM};
+    ThetaCtrlLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
+    ThetaCtrlLUT(LUT_row,'NEpochs') = {NEpochs};
+    ThetaCtrlLUT(LUT_row,'NSamples') = {NSamples};
+    ThetaCtrlLUT(LUT_row,'MinRwd') = {minRwd};
     
-    ThetaLUT(LUT_row,'Th_stiffness_x') = {ThLearnt(1)};
-    ThetaLUT(LUT_row,'Th_stiffness_y') = {ThLearnt(2)};
-    ThetaLUT(LUT_row,'Th_stiffness_z') = {ThLearnt(3)};
-    ThetaLUT(LUT_row,'Th_damping_x') = {ThLearnt(4)};
-    ThetaLUT(LUT_row,'Th_damping_y') = {ThLearnt(5)};
-    ThetaLUT(LUT_row,'Th_damping_z') = {ThLearnt(6)};
-    ThetaLUT(LUT_row,'Th_z_sum') = {ThLearnt(7)};
+    ThetaCtrlLUT(LUT_row,'Th_stiffness_x') = {ThLearnt(1)};
+    ThetaCtrlLUT(LUT_row,'Th_stiffness_y') = {ThLearnt(2)};
+    ThetaCtrlLUT(LUT_row,'Th_stiffness_z') = {ThLearnt(3)};
+    ThetaCtrlLUT(LUT_row,'Th_damping_x') = {ThLearnt(4)};
+    ThetaCtrlLUT(LUT_row,'Th_damping_y') = {ThLearnt(5)};
+    ThetaCtrlLUT(LUT_row,'Th_damping_z') = {ThLearnt(6)};
+    ThetaCtrlLUT(LUT_row,'Th_z_sum') = {ThLearnt(7)};
 end
-ThetaLUTcpp = ThetaLUT(:,{'ExpSetN','NExp','NTrial','Ts','nSOM','nCOM', ...
-                          'Th_stiffness_x','Th_stiffness_y','Th_stiffness_z', ...
-                          'Th_damping_x','Th_damping_y','Th_damping_z', ...
-                          'Th_z_sum'});
-writetable(ThetaLUT,'ThetaModelLUT.csv');
-writematrix(table2array(ThetaLUTcpp),'ThetaLUTcpp.csv');
-fprintf('Updated ThetaModelLUT.csv and ThetaLUTcpp.csv\n');
+writetable(ThetaCtrlLUT,'ThetaControlLUT.csv');
+fprintf('Updated ThetaControlLUT.csv\n');
 

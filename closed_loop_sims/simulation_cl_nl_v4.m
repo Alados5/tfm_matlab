@@ -242,12 +242,10 @@ opts.ipopt.warm_start_init_point = 'yes'; %warm start
 
 solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 
-%----------------------------------------------
-% ALL OF THE ABOVE IS JUST A PROBLEM SET UP
 
-%%
-% THE SIMULATION LOOP SHOULD START FROM HERE
-%-------------------------------------------
+%----------------------------------%
+%% MAIN SIMULATION LOOP EXECUTION %%
+%----------------------------------%
 
 % Initialize control
 u_ini = x_ini_SOM(SOM.coord_ctrl);

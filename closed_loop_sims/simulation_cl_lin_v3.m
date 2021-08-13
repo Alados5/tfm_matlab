@@ -14,7 +14,7 @@ plotAnim = 0;
 animwWAM = 0;
 
 % General Parameters
-NTraj = 10;
+NTraj = 6;
 nCOM = 4;
 nSOM = 4;
 Hp = 25;
@@ -28,13 +28,13 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 xbound = 1;
 ubound = 5*1e-3;
-gbound = 0;  % 0 -> Equality constraint
+gbound = 0; % 0 -> Equality constraint
 W_Q = 1;
 W_T = 1;
 W_R = 10;
 
 % Noise parameters
-sigmaX = 0.04;
+sigmaX = 0.0;
 
 % -------------------
 
@@ -247,12 +247,10 @@ opts.ipopt.warm_start_init_point = 'yes'; %warm start
 
 solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 
-%----------------------------------------------
-% ALL OF THE ABOVE IS JUST A PROBLEM SET UP
 
-%%
-% THE SIMULATION LOOP SHOULD START FROM HERE
-%-------------------------------------------
+%----------------------------------%
+%% MAIN SIMULATION LOOP EXECUTION %%
+%----------------------------------%
 
 % Initialize control
 u_ini = x_ini_SOM(SOM.coord_ctrl);
