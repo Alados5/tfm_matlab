@@ -15,10 +15,10 @@ animwWAM = 0;
 
 % General Parameters
 NTraj = 6;
-nCOM = 4;
-nSOM = 4;
-Hp = 25;
 Ts = 0.020;
+Hp = 25;
+nSOM = 4;
+nCOM = 4;
 ExpSetN = 4;
 NExp = 8;
 NTrial = 2;

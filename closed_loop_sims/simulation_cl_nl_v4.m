@@ -16,11 +16,11 @@ plotAnim = 0;
 animwWAM = 0;
 
 % General Parameters
-NTraj = 10;
-nCOM = 4;
-nSOM = 4;
-Hp = 25;
+NTraj = 6;
 Ts = 0.020;
+Hp = 25;
+nSOM = 4;
+nCOM = 4;
 ExpSetN = 4;
 NExp = 8;
 NTrial = 2;
@@ -350,7 +350,7 @@ for tk=2:size(phi_l_Traj,1)
     PoseTCP.orientation = rotm2quat(Rtcp);
     
     % Simulate a step of the SOM
-    x_noise = [normrnd(0,sigmaX^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_noise = [normrnd(0,sigmaX^2,[3*nSOM^2,1]); zeros(3*nSOM^2,1)];
     x_prev_noisy = store_state(:,tk-1) + x_noise;
     [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_prev_noisy,u_SOM,SOM); 
     
