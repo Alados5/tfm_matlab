@@ -36,13 +36,14 @@ W_R = theta(5);
 
 
 % Load trajectory to follow
-phi_l_Traj = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
-phi_r_Traj = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
+Ref_l = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
+Ref_r = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
+nPtRef = size(Ref_l,1);
 
 % Get implied cloth size, position and angle wrt XZ
-dphi_corners1 = phi_r_Traj(1,:) - phi_l_Traj(1,:);
+dphi_corners1 = Ref_r(1,:) - Ref_l(1,:);
 lCloth = norm(dphi_corners1);
-cCloth = (phi_r_Traj(1,:) + phi_l_Traj(1,:))/2 + [0 0 lCloth/2];
+cCloth = (Ref_r(1,:) + Ref_l(1,:))/2 + [0 0 lCloth/2];
 aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
 % Define COM parameters
@@ -228,16 +229,16 @@ store_u(:,1) = zeros(6,1);
 
 tT0 = tic;
 t0 = tic;
-printX = floor(size(phi_l_Traj,1)/5);
-for tk=2:size(phi_l_Traj,1)
+printX = floor(nPtRef/5);
+for tk=2:nPtRef
     
     % The last Hp timesteps, trajectory should remain constant
-    if tk>=size(phi_l_Traj,1)-Hp 
-        Traj_l_Hp = repmat(phi_l_Traj(end,:), Hp,1);
-        Traj_r_Hp = repmat(phi_r_Traj(end,:), Hp,1);
+    if tk>=nPtRef-Hp 
+        Traj_l_Hp = repmat(Ref_l(end,:), Hp,1);
+        Traj_r_Hp = repmat(Ref_r(end,:), Hp,1);
     else
-        Traj_l_Hp = phi_l_Traj(tk:tk+Hp-1,:);
-        Traj_r_Hp = phi_r_Traj(tk:tk+Hp-1,:);
+        Traj_l_Hp = Ref_l(tk:tk+Hp-1,:);
+        Traj_r_Hp = Ref_r(tk:tk+Hp-1,:);
     end
     
     % Rotate initial position to cloth base
@@ -317,12 +318,13 @@ for tk=2:size(phi_l_Traj,1)
     end
 end
 tT = toc(tT0);
-fprintf([' -- Total time: ',num2str(tT),' s \n']);
+fprintf([' -- Total time: \t',num2str(tT),' s \n', ...
+         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
 
 
 %% KPI and Reward
-error_l = 1000*(store_state(coord_nl([1,3,5]),:)'-phi_l_Traj);
-error_r = 1000*(store_state(coord_nl([2,4,6]),:)'-phi_r_Traj);
+error_l = 1000*(store_state(coord_nl([1,3,5]),:)'-Ref_l);
+error_r = 1000*(store_state(coord_nl([2,4,6]),:)'-Ref_r);
 
 eMAE = mean(abs([error_l error_r]));
 eRMSE = sqrt(mean([error_l error_r].^2));
@@ -331,7 +333,7 @@ eRMSEp = mean([norm(eRMSE([1,3,5]),2) norm(eRMSE([2,4,6]),2)]);
 eRwds = -[eMAEp eRMSEp];
 
 Rwd = eRwds(2); %RMSE
-fprintf([' -- Reward: ', num2str(Rwd), '\n']);
+fprintf([' -- Sim. Reward: \t', num2str(Rwd), '\n']);
 if isnan(Rwd)
     Rwd = -inf;
 end

@@ -2,12 +2,12 @@ close all; clc; clear;
 
 %% Initialization
 ExpSetN = 1;
-SimType = 'LIN'; %LIN, NL, RTM
+SimType = 'RTM'; %LIN, NL, RTM
 ExpSetNote = '';
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
-Wv = 0;
+Wv = 0.3;
 sigmaX = 0.0;
 nSOM = 4;
 nCOM = 4;
@@ -16,7 +16,7 @@ nNLM = 10;
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
-e0 = 25;
+e0 = 0;
 minRwd = -100;
 NSamples = 10;
 NEpochs = 5;
@@ -72,9 +72,7 @@ opts.W_R = 10;
 
 ThMask = [0.001 0.001 1 1 1]';
 ThW = 3:5;
-dirname = ['Exps',num2str(ExpSetN), '_',SimType, ExpSetNote, ...
-           '/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
-           '_hp',num2str(Hp), '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
+
 UseLambda = 1;
 if e0==0
     % Initial seed [xbound; ubound; gbound; WQ; WT; WR]
@@ -99,13 +97,20 @@ end
 
 if strcmp(SimType, 'LIN')
     SimTypeN = 0;
+    wvname = '';
 elseif strcmp(SimType, 'NL')
     SimTypeN = 1;
+    wvname = '';
 elseif strcmp(SimType, 'RTM') || strcmp(SimType, 'RT')
     SimTypeN = 2;
+    wvname = ['_wv', num2str(Wv*100)];
 else
     error(['Simulation type "',SimType,'" is not a valid option.']);
 end
+
+dirname = ['Exps',num2str(ExpSetN), '_',SimType, ExpSetNote, ...
+           '/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
+           '_hp',num2str(Hp), wvname, '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
 
 NParams = length(mw0);
 

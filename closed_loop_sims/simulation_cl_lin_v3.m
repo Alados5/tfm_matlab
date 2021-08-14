@@ -26,12 +26,12 @@ zsum0 = 0*-0.002;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
-xbound = 1;
-ubound = 5*1e-3;
-gbound = 0; % 0 -> Equality constraint
-W_Q = 1;
-W_T = 1;
-W_R = 10;
+xbound = 1.5;
+ubound = 6.4*1e-3;
+gbound = 0.6*1e-3; % 0 -> Equality constraint
+W_Q = 1;    %1
+W_T = 0.42; %1
+W_R = 0.14; %10
 
 % Noise parameters
 sigmaX = 0.0;
@@ -40,13 +40,14 @@ sigmaX = 0.0;
 
 
 % Load trajectory to follow
-phi_l_Traj = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
-phi_r_Traj = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
+Ref_l = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
+Ref_r = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
+nPtRef = size(Ref_l,1);
 
 % Get implied cloth size, position and angle wrt XZ
-dphi_corners1 = phi_r_Traj(1,:) - phi_l_Traj(1,:);
+dphi_corners1 = Ref_r(1,:) - Ref_l(1,:);
 lCloth = norm(dphi_corners1);
-cCloth = (phi_r_Traj(1,:) + phi_l_Traj(1,:))/2 + [0 0 lCloth/2];
+cCloth = (Ref_r(1,:) + Ref_l(1,:))/2 + [0 0 lCloth/2];
 aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
 % Define COM parameters
@@ -281,15 +282,15 @@ store_pose(1) = struct('position', tcp_ini, ...
 tT0 = tic;
 t0 = tic;
 printX = 50;
-for tk=2:size(phi_l_Traj,1)
+for tk=2:nPtRef
     
     % The last Hp timesteps, trajectory should remain constant
-    if tk>=size(phi_l_Traj,1)-Hp 
-        Traj_l_Hp = repmat(phi_l_Traj(end,:), Hp,1);
-        Traj_r_Hp = repmat(phi_r_Traj(end,:), Hp,1);
+    if tk>=nPtRef-Hp 
+        Ref_l_Hp = repmat(Ref_l(end,:), Hp,1);
+        Ref_r_Hp = repmat(Ref_r(end,:), Hp,1);
     else
-        Traj_l_Hp = phi_l_Traj(tk:tk+Hp-1,:);
-        Traj_r_Hp = phi_r_Traj(tk:tk+Hp-1,:);
+        Ref_l_Hp = Ref_l(tk:tk+Hp-1,:);
+        Ref_r_Hp = Ref_r(tk:tk+Hp-1,:);
     end
     
     % Rotate initial position to cloth base
@@ -302,8 +303,8 @@ for tk=2:size(phi_l_Traj,1)
                      reshape(vel_ini_COM_rot,[3*nxC*nyC,1])];
                  
     % Rotate reference trajectory to cloth base
-    Traj_l_Hp_rot = (Rcloth^-1 * Traj_l_Hp')';
-    Traj_r_Hp_rot = (Rcloth^-1 * Traj_r_Hp')';
+    Traj_l_Hp_rot = (Rcloth^-1 * Ref_l_Hp')';
+    Traj_r_Hp_rot = (Rcloth^-1 * Ref_r_Hp')';
     
     % Define reference in the prediction horizon (sliding window)
     reference(:,1) = x_ini_COM_rot;
@@ -391,12 +392,14 @@ for tk=2:size(phi_l_Traj,1)
     end
 end
 tT = toc(tT0);
-fprintf(['Total time: ',num2str(tT),' s \n']);
+fprintf(['-----------------------------------------\n', ...
+         ' -- Total time: \t',num2str(tT),' s \n', ...
+         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
 
 
 %% KPI
-error_l = store_state(coord_lcS([1,3,5]),:)'-phi_l_Traj(1:end,1:3);
-error_r = store_state(coord_lcS([2,4,6]),:)'-phi_r_Traj(1:end,1:3);
+error_l = store_state(coord_lcS([1,3,5]),:)'-Ref_l;
+error_r = store_state(coord_lcS([2,4,6]),:)'-Ref_r;
 
 eMAE = mean(abs([error_l error_r]));
 eMSE = mean([error_l error_r].^2);
@@ -460,7 +463,7 @@ set(gca, 'TickLabelInterpreter', 'latex');
 subplot(15,2,17:2:28);
 plot(time, store_state(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
 hold on
-plot(time, phi_l_Traj, '--k', 'linewidth',1.2);
+plot(time, Ref_l, '--k', 'linewidth',1.2);
 hold off
 title('\textbf{Left lower corner}', 'Interpreter', 'latex')
 grid on
@@ -472,7 +475,7 @@ set(gca, 'TickLabelInterpreter', 'latex');
 subplot(15,2,18:2:28);
 pa1som = plot(time, store_state(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
 hold on
-pa1ref = plot(time, phi_r_Traj, '--k', 'linewidth',1.2);
+pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
 hold off
 title('\textbf{Right lower corner}', 'Interpreter', 'latex')
 grid on
@@ -501,11 +504,11 @@ SOM_ctrl = SOM.coord_ctrl(1:2);
 SOM_lowc = coord_lcS(1:2);
 store_pos = store_state(1:3*SOMlength,:);
 All_uSOM = store_state(SOM.coord_ctrl,:);
-TCP_pos = reshape([store_pose.position],[3,size(phi_l_Traj,1)])';
-TCP_q   = reshape([store_pose.orientation],[4,size(phi_l_Traj,1)])';
+TCP_pos = reshape([store_pose.position],[3,size(Ref_l,1)])';
+TCP_q   = reshape([store_pose.orientation],[4,size(Ref_l,1)])';
 TCP_rot = quat2rotm(TCP_q);
 TCP_Tm  = [TCP_rot permute(TCP_pos',[1,3,2]);
-          [0 0 0 1].*ones(1,1,size(phi_l_Traj,1))];
+          [0 0 0 1].*ones(1,1,size(Ref_l,1))];
 
 store_x = store_pos(1:SOMlength,:);
 limx = [floor(min(store_x(:))*10), ceil(max(store_x(:))*10)]/10;
@@ -522,8 +525,8 @@ plot3(store_x(SOM_lowc,:)', store_y(SOM_lowc,:)', store_z(SOM_lowc,:)');
 
 scatter3(TCP_pos(1,1), TCP_pos(1,2), TCP_pos(1,3), 'om', 'filled');
 plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
-plot3(phi_l_Traj(:,1),phi_l_Traj(:,2),phi_l_Traj(:,3), '--k');
-plot3(phi_r_Traj(:,1),phi_r_Traj(:,2),phi_r_Traj(:,3), '--k');
+plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
+plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
 
 scatter3(store_x(:,1), store_y(:,1), store_z(:,1), '.b');
 hold off
@@ -559,8 +562,8 @@ if(plotAnim > 0)
         scatter3(TCP_pos(t,1), TCP_pos(t,2), TCP_pos(t,3), 'om', 'filled');
                 
         plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
-        plot3(phi_l_Traj(:,1),phi_l_Traj(:,2),phi_l_Traj(:,3), '--k');
-        plot3(phi_r_Traj(:,1),phi_r_Traj(:,2),phi_r_Traj(:,3), '--k');
+        plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
+        plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
         
         hold off
         axis equal; box on; grid on;
@@ -605,8 +608,8 @@ if(plotAnim > 0)
 
     scatter3(TCP_pos(t,1), TCP_pos(t,2), TCP_pos(t,3), 'om', 'filled');
     plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
-    plot3(phi_l_Traj(:,1),phi_l_Traj(:,2),phi_l_Traj(:,3), '--k');
-    plot3(phi_r_Traj(:,1),phi_r_Traj(:,2),phi_r_Traj(:,3), '--k');
+    plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
+    plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
 
     scatter3(store_x(:,t), store_y(:,t), store_z(:,t), '.b');
     hold off
