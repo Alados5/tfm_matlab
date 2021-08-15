@@ -16,7 +16,7 @@ nNLM = 10;
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
-e0 = 0;
+e0 = 5;
 minRwd = -100;
 NSamples = 10;
 NEpochs = 5;
