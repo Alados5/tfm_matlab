@@ -2,7 +2,7 @@ close all; clc; clear;
 
 %% Initialization
 ExpSetN = 1;
-SimType = 'RTM'; %LIN, NL, RTM
+SimType = 'NL'; %LIN, NL, RTM
 ExpSetNote = '';
 NTraj = 6;
 Ts = 0.020;
@@ -16,13 +16,20 @@ nNLM = 10;
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
-e0 = 5;
+e0 = 45;
 minRwd = -100;
 NSamples = 10;
 NEpochs = 5;
+UseLambda = 1;
 
 Plot3DTraj = 0;
 Plot2DTraj = 1;
+
+% Parameters to learn and defaults:
+%  [ubound=5*1e-3, gbound=0*1e-3, W_Q=1, W_T=1, W_R=10]
+ThMask = [0.001 0.001 1 1 1]';
+ThW = 3:5;
+
 
 % Load parameter table and select corresponding row
 ThetaModelLUT = readtable('./ThetaModelLUT.csv');
@@ -61,19 +68,25 @@ opts.paramsCOM = paramsCOM;
 opts.xbound = 1.5;
 % ----------
 
-% Parameters used in real robot and all previous sims
-%{
-opts.ubound = 5*1e-3;
-opts.gbound = 0*1e-3;  % 0 -> Equality constraint
-opts.W_Q = 1;
-opts.W_T = 1;
-opts.W_R = 10;
-%}
 
-ThMask = [0.001 0.001 1 1 1]';
-ThW = 3:5;
+if strcmp(SimType, 'LIN')
+    SimTypeN = 0;
+    wvname = '';
+elseif strcmp(SimType, 'NL')
+    SimTypeN = 1;
+    wvname = '';
+elseif strcmp(SimType, 'RTM') || strcmp(SimType, 'RT')
+    SimTypeN = 2;
+    wvname = ['_wv', num2str(Wv*100)];
+else
+    error(['Simulation type "',SimType,'" is not a valid option.']);
+end
 
-UseLambda = 1;
+dirname = ['Exps',num2str(ExpSetN), '_',SimType, ExpSetNote, ...
+           '/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
+           '_hp',num2str(Hp), wvname, '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
+
+
 if e0==0
     % Initial seed [xbound; ubound; gbound; WQ; WT; WR]
     mw0 = [5; 0;          0.5; 0.5; 0.5];
@@ -94,23 +107,6 @@ else
     THans = THans.TH;
     THprev = THans(:,:,end);
 end
-
-if strcmp(SimType, 'LIN')
-    SimTypeN = 0;
-    wvname = '';
-elseif strcmp(SimType, 'NL')
-    SimTypeN = 1;
-    wvname = '';
-elseif strcmp(SimType, 'RTM') || strcmp(SimType, 'RT')
-    SimTypeN = 2;
-    wvname = ['_wv', num2str(Wv*100)];
-else
-    error(['Simulation type "',SimType,'" is not a valid option.']);
-end
-
-dirname = ['Exps',num2str(ExpSetN), '_',SimType, ExpSetNote, ...
-           '/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
-           '_hp',num2str(Hp), wvname, '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
 
 NParams = length(mw0);
 
@@ -248,7 +244,8 @@ fprintf('Saved data files. \n');
 
 hf1 = figure(1);
 hf1.Color = [1,1,1];
-hf1.Position = hf1.Position - [250 0 0 0];
+hf1.Units = 'normalized';
+hf1.Position = [0 0.5 0.5 0.4];
 
 % Evolution of sample mean rewards
 RW2D = permute(RW, [2,3,1]);
@@ -279,11 +276,12 @@ if (min(min(hf1.Children.YLim)) < minRwd)
     ylim([minRwd, min(max(RWMW)+10,0)]);
 end
 
+
 % Full experiment
 hf2 = figure(2);
 hf2.Color = [1,1,1];
-hf2.Position = hf1.Position + [500 0 0 0];
-
+hf2.Units = 'normalized';
+hf2.Position = [0 0.05 0.5 0.4];
 
 full_exp_plot(dirname, 2);
 if (min(min(hf2.Children.YLim)) < minRwd)
@@ -294,25 +292,31 @@ end
 %% 3D & 2D Plots
 tSim = 0:Ts:size(AllData.xSOM,2)*Ts-Ts;
 SOM_node_ctrl = [opts.nSOM*(opts.nSOM-1)+1, opts.nSOM*opts.nSOM];
-SOM_coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+opts.nSOM^2 SOM_node_ctrl+2*opts.nSOM^2];
 COM_node_ctrl = [opts.nCOM*(opts.nCOM-1)+1, opts.nCOM*opts.nCOM];
-COM_coord_ctrl = [COM_node_ctrl, COM_node_ctrl+opts.nCOM^2, COM_node_ctrl+2*opts.nCOM^2];
-coord_l  = [1 opts.nCOM 1+opts.nCOM^2 opts.nCOM^2+opts.nCOM 2*opts.nCOM^2+1 2*opts.nCOM^2+opts.nCOM]; 
-coord_nl = [1 opts.nSOM 1+opts.nSOM^2 opts.nSOM^2+opts.nSOM 2*opts.nSOM^2+1 2*opts.nSOM^2+opts.nSOM];
+NLM_node_ctrl = [opts.nNLM*(opts.nNLM-1)+1, opts.nNLM*opts.nNLM];
+coord_ctrlS = [SOM_node_ctrl SOM_node_ctrl+opts.nSOM^2 SOM_node_ctrl+2*opts.nSOM^2];
+coord_ctrlC = [COM_node_ctrl COM_node_ctrl+opts.nCOM^2 COM_node_ctrl+2*opts.nCOM^2];
+coord_ctrlN = [NLM_node_ctrl NLM_node_ctrl+opts.nNLM^2 NLM_node_ctrl+2*opts.nNLM^2];
+coord_lcS = [1 opts.nSOM 1+opts.nSOM^2 opts.nSOM^2+opts.nSOM 2*opts.nSOM^2+1 2*opts.nSOM^2+opts.nSOM];
+coord_lcC = [1 opts.nCOM 1+opts.nCOM^2 opts.nCOM^2+opts.nCOM 2*opts.nCOM^2+1 2*opts.nCOM^2+opts.nCOM]; 
+coord_lcN = [1 opts.nNLM 1+opts.nNLM^2 opts.nNLM^2+opts.nNLM 2*opts.nNLM^2+1 2*opts.nNLM^2+opts.nNLM]; 
 
-refL = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
-refR = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
+
+Ref_l = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
+Ref_r = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
+nPtRef = size(Ref_l,1);
+
 
 % 3D trajectories (uc & lc)
 if(Plot3DTraj==1)
     hf3 = figure(3);
     hf3.Color = [1,1,1];
 
-    plot3(AllData.xSOM(SOM_coord_ctrl(1:2),:)', AllData.xSOM(SOM_coord_ctrl(3:4),:)', AllData.xSOM(SOM_coord_ctrl(5:6),:)');
+    plot3(AllData.xSOM(coord_ctrlS(1:2),:)', AllData.xSOM(coord_ctrlS(3:4),:)', AllData.xSOM(coord_ctrlS(5:6),:)');
     hold on
-    plot3(AllData.xSOM(coord_nl(1:2),:)', AllData.xSOM(coord_nl(3:4),:)', AllData.xSOM(coord_nl(5:6),:)');
-    plot3(refL(:,1), refL(:,2), refL(:,3), '--k', 'linewidth',1);
-    plot3(refR(:,1), refR(:,2), refR(:,3), '--k', 'linewidth',1);
+    plot3(AllData.xSOM(coord_lcS(1:2),:)', AllData.xSOM(coord_lcS(3:4),:)', AllData.xSOM(coord_lcS(5:6),:)');
+    plot3(Ref_l(:,1), Ref_l(:,2), Ref_l(:,3), '--k', 'linewidth',1);
+    plot3(Ref_r(:,1), Ref_r(:,2), Ref_r(:,3), '--k', 'linewidth',1);
     hold off
     box on; grid on;
     axis equal
@@ -323,30 +327,50 @@ end
 if(Plot2DTraj==1)
     hf4 = figure(4);
     hf4.Color = [1,1,1];
-
-    subplot(10,2,1:2:18);
-    plot(tSim, AllData.xSOM(coord_nl([1,3,5]),:), 'linewidth',1.5);
-    hold on
-    plot(tSim, refL, '--k', 'linewidth',1);
-    hold off
+    hf4.Units = 'normalized';
+    hf4.Position = [0.5 0.05 0.5 0.65];
+    
+    subplot(15,2,1:2:12);
+    plot(tSim, AllData.xSOM(coord_ctrlS([1,3,5]),:), 'linewidth',1.5);
     grid on
     set(gca,'TickLabelInterpreter','latex');
     ylim41 = ylim;
-
-    subplot(10,2,2:2:18);
-    pa4som = plot(tSim, AllData.xSOM(coord_nl([2,4,6]),:), 'linewidth',1.5);
-    hold on
-    pa4ref = plot(tSim, refR, '--k', 'linewidth',1);
-    hold off
+    
+    subplot(15,2,2:2:12);
+    plot(tSim, AllData.xSOM(coord_ctrlS([2,4,6]),:), 'linewidth',1.5);
     grid on
     set(gca,'TickLabelInterpreter','latex');
     ylim42 = ylim;
+    
+    ylim4high = [min(ylim41(1), ylim42(1)), max(ylim41(2), ylim42(2))];
+    subplot(15,2,1:2:12);
+    ylim(ylim4high);
+    subplot(15,2,2:2:12);
+    ylim(ylim4high);
 
-    ylim4 = [min(ylim41(1), ylim42(1)), max(ylim41(2), ylim42(2))];
-    subplot(10,2,1:2:18);
-    ylim(ylim4);
-    subplot(10,2,2:2:18);
-    ylim(ylim4);
+    subplot(15,2,17:2:28);
+    plot(tSim, AllData.xSOM(coord_lcS([1,3,5]),:), 'linewidth',1.5);
+    hold on
+    plot(tSim, Ref_l, '--k', 'linewidth',1);
+    hold off
+    grid on
+    set(gca,'TickLabelInterpreter','latex');
+    ylim43 = ylim;
+
+    subplot(15,2,18:2:28);
+    pa4som = plot(tSim, AllData.xSOM(coord_lcS([2,4,6]),:), 'linewidth',1.5);
+    hold on
+    pa4ref = plot(tSim, Ref_r, '--k', 'linewidth',1);
+    hold off
+    grid on
+    set(gca,'TickLabelInterpreter','latex');
+    ylim44 = ylim;
+
+    ylim4low = [min(ylim43(1), ylim44(1)), max(ylim43(2), ylim44(2))];
+    subplot(15,2,17:2:28);
+    ylim(ylim4low);
+    subplot(15,2,18:2:28);
+    ylim(ylim4low);
 
     Lgnd4 = legend([pa4som; pa4ref(1)], ...
                    '$x_{SOM}$','$y_{SOM}$','$z_{SOM}$', 'Ref', ...
