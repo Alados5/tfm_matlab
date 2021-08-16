@@ -27,8 +27,8 @@ TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
 xbound = 1.5;
-ubound = 6.4*1e-3;
-gbound = 0.6*1e-3; % 0 -> Equality constraint
+ubound = 10*1e-3;
+gbound = 0*1e-3; % 0 -> Equality constraint
 W_Q = 1;    %1
 W_T = 0.42; %1
 W_R = 0.14; %10
