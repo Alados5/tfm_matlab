@@ -41,13 +41,8 @@ sigmaN = 0.004;
 % -------------------
 
 
-% Experiments tested
+% Notes for tested Model Parameters
 %{
-ExpSetN = 0; NExp = 0; NTrial = 0;      % Optimized OG
-ExpSetN = 1; NExp = 2; NTrial = 1;      % Set 1 (NLSOM, CL)
-ExpSetN = 1; NExp = 3; NTrial = 1;      % Set 1 (NLSOM, CL)
-ExpSetN = 1; NExp = 4; NTrial = 1;      % Set 1 (NLSOM, OL)
-ExpSetN = 1; NExp = 7; NTrial = 1;      % Set 1 (NLSOM, OL)
 ExpSetN = 3; NExp = 8; NTrial = 2;      % Set 3 (Real, no trim/pad)
 if(Ts == 0.015), zsum0 = +0.010; end;   % Enable with previous
 ExpSetN = 4; NExp = 8; NTrial = 1;      % Set 4 (Real, trim+pad=100)
@@ -151,8 +146,8 @@ u = SX.sym('u',6);
 x_next = SX.sym('xdot',6*COM.row*COM.col);
 x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 
-% (x,u)->(x_next)
-stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
+% NL Map: (x,u)->(x_next)
+stfun = Function('stfun',{x,u},{x_next});
 
 % Lower corner coordinates for both models
 coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 

@@ -9,7 +9,8 @@ if nargin < 2
     NTraj = 6;
     Ts = 0.020;
     Hp = 25;
-    sigmaX = 0;
+    sigmaD = 0;
+    sigmaN = 0;
     nCOM = 4;
     nSOM = 4;
     paramsSOM = [-300 -10 -225  -4 -2.5 -4 0.03];
@@ -19,7 +20,8 @@ else
     NTraj = opts.NTraj;
     Ts = opts.Ts;
     Hp = opts.Hp;
-    sigmaX = opts.sigmaX;
+    sigmaD = opts.sigmaD;
+    sigmaN = opts.sigmaN;
     nCOM = opts.nCOM;
     nSOM = opts.nSOM;
     paramsSOM = opts.paramsSOM;
@@ -132,8 +134,8 @@ u = SX.sym('u',6);
 x_next = SX.sym('xdot',6*COM.row*COM.col);
 x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 
-% (x,u)->(x_next)
-stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
+% NL Map: (x,u)->(x_next)
+stfun = Function('stfun',{x,u},{x_next});
 
 % Lower corner coordinates for both models
 coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
@@ -241,6 +243,7 @@ Rcloth = [cloth_x cloth_y cloth_z];
 % Initialize things
 reference = zeros(6*COM.row*COM.col, Hp+1);
 store_state(:,1) = x_ini_SOM;
+store_noisy(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
 
 tT0 = tic;
@@ -302,12 +305,13 @@ for tk=2:nPtRef
     u_SOM = u_lin+u_bef;
     u_bef = u_SOM;
     
-    % Linear SOM uses local variables too (rot)
-    x_noise = [normrnd(0,sigmaX^2,[n_states/2,1]); zeros(n_states/2,1)];
-    x_prev_noisy = store_state(:,tk-1) + x_noise;
+    % Add disturbance to SOM positions
+    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_distd = store_state(:,tk-1) + x_dist*(tk>20);
     
-    pos_ini_SOM = reshape(x_prev_noisy(1:3*nxS*nyS), [nxS*nyS,3]);
-    vel_ini_SOM = reshape(x_prev_noisy(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
+    % Linear SOM uses local variables too (rot)
+    pos_ini_SOM = reshape(x_distd(1:3*nxS*nyS), [nxS*nyS,3]);
+    vel_ini_SOM = reshape(x_distd(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
     vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
     x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
@@ -321,9 +325,13 @@ for tk=2:nPtRef
     vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nxS*nyS):6*nxS*nyS), [nxS*nyS,3]); 
     pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nxS*nyS,1]);
     vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
+    
+    % Add sensor noise to positions
+    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
+    pos_noisy = pos_nxt_SOM + pos_noise*(tk>20);
         
-    % Close the loop
-    [phired, dphired] = take_reduced_mesh(pos_nxt_SOM,vel_nxt_SOM, nSOM, nCOM);
+    % Get COM states from SOM (Close the loop)
+    [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);
     x_ini_COM = [phired; dphired];
     
     % Get new Cloth orientation (rotation matrix)
@@ -338,6 +346,7 @@ for tk=2:nPtRef
     
     % Store things
     store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
+    store_noisy(:,tk) = [pos_noisy; vel_nxt_SOM];
     store_u(:,tk) = u_lin;
     
     if(mod(tk,printX)==0)
@@ -371,9 +380,10 @@ end
 
 %% SAVE DATA
 AllData = struct();
-AllData.xSOM = store_state;
-AllData.uSOM = store_state(SOM.coord_ctrl,:);
-AllData.ulin = store_u;
+AllData.xSOM  = store_state;
+AllData.xSOMn = store_noisy;
+AllData.uSOM  = store_state(SOM.coord_ctrl,:);
+AllData.ulin  = store_u;
 
 
 end

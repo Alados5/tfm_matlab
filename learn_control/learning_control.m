@@ -2,13 +2,14 @@ close all; clc; clear;
 
 %% Initialization
 ExpSetN = 1;
-SimType = 'RTM'; %LIN, NL, RTM
+SimType = 'LIN'; %LIN, NL, RTM
 ExpSetNote = '';
 NTraj = 6;
-Ts = 0.020;
-Hp = 25;
+Ts = 0.025;
+Hp = 20;
 Wv = 0.3;
-sigmaX = 0.0;
+sigmaD = 0.0;
+sigmaN = 0.0;
 nSOM = 4;
 nCOM = 4;
 nNLM = 10;
@@ -16,7 +17,7 @@ nNLM = 10;
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
-e0 = 20;
+e0 = 10;
 minRwd = -100;
 NSamples = 10;
 NEpochs = 5;
@@ -59,7 +60,8 @@ opts.NTraj = NTraj;
 opts.Ts = Ts;
 opts.Hp = Hp;
 opts.Wv = Wv;
-opts.sigmaX = sigmaX;
+opts.sigmaD = sigmaD;
+opts.sigmaN = sigmaN;
 opts.nSOM = nSOM;
 opts.nCOM = nCOM;
 opts.nNLM = nNLM;

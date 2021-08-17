@@ -11,7 +11,8 @@ if nargin < 2
     Ts = 0.020;
     Hp = 25;
     Wv = 0.2;
-    sigmaX = 0;
+    sigmaD = 0;
+    sigmaN = 0;
     nCOM = 4;
     nSOM = 4;
     nNLM = 10;
@@ -23,7 +24,8 @@ else
     Ts = opts.Ts;
     Hp = opts.Hp;
     Wv = opts.Wv;
-    sigmaX = opts.sigmaX;
+    sigmaD = opts.sigmaD;
+    sigmaN = opts.sigmaN;
     nCOM = opts.nCOM;
     nSOM = opts.nSOM;
     nNLM = opts.nNLM;
@@ -144,8 +146,8 @@ u = SX.sym('u',6);
 x_next = SX.sym('xdot',6*COM.row*COM.col);
 x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 
-% (x,u)->(x_next)
-stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
+% NL Map: (x,u)->(x_next)
+stfun = Function('stfun',{x,u},{x_next});
 
 % Lower corner coordinates for both models
 coord_lcC = [1 nCOM 1+nCOM^2 nCOM^2+nCOM 2*nCOM^2+1 2*nCOM^2+nCOM]; 
@@ -254,6 +256,7 @@ Rcloth = [cloth_x cloth_y cloth_z];
 reference = zeros(6*COM.row*COM.col, Hp+1);
 store_somstate(:,1) = x_ini_SOM;
 store_nlmstate(:,1) = x_ini_NLM;
+store_nlmnoisy(:,1) = x_ini_NLM;
 store_u(:,1) = zeros(6,1);
 
 tT0 = tic;
@@ -262,14 +265,14 @@ printX = floor(nPtRef/5);
 for tk=2:nPtRef
     
     % Get new feedback value (eq. to "Spin once")
-    x_noise_nl = [normrnd(0,sigmaX^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_prev_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl;
+    x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
+    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>20);
     
-    [phi_noisy, dphi_noisy] = take_reduced_mesh(x_prev_noisy_nl(1:3*nNLM^2), ...
-                                      x_prev_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
+    [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
+                                      x_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
                                       nNLM, nSOM);
-    x_prev_noisy = [phi_noisy; dphi_noisy];
-    x_prev_wavg = x_prev_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
+    x_noisy = [phi_noisy; dphi_noisy];
+    somst_wavg = x_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
     
     % The last Hp timesteps, trajectory should remain constant
     if tk>=nPtRef-Hp 
@@ -279,6 +282,12 @@ for tk=2:nPtRef
         Traj_l_Hp = Ref_l(tk:tk+Hp-1,:);
         Traj_r_Hp = Ref_r(tk:tk+Hp-1,:);
     end
+    
+    % Get COM states from SOM (Close the loop)
+    [phired, dphired] = take_reduced_mesh(somst_wavg(1:n_states/2), ...
+                                          somst_wavg(n_states/2+1:n_states), ...
+                                          nSOM, nCOM);
+    x_ini_COM = [phired; dphired];
     
     % Rotate initial position to cloth base
     pos_ini_COM = reshape(x_ini_COM(1:3*nCOM^2),[nCOM^2,3]);
@@ -326,8 +335,8 @@ for tk=2:nPtRef
     u_bef = u_SOM;
     
     % Linear SOM uses local variables too (rot)
-    pos_ini_SOM = reshape(x_prev_wavg(1:3*nSOM^2), [nSOM^2,3]);
-    vel_ini_SOM = reshape(x_prev_wavg(3*nSOM^2+1:6*nSOM^2), [nSOM^2,3]);
+    pos_ini_SOM = reshape(somst_wavg(1:3*nSOM^2), [nSOM^2,3]);
+    vel_ini_SOM = reshape(somst_wavg(3*nSOM^2+1:6*nSOM^2), [nSOM^2,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
     vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
     x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nSOM^2,1]);
@@ -336,18 +345,18 @@ for tk=2:nPtRef
     % Simulate a SOM step
     next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
     
+    % Add disturbance to NLM positions
+    x_dist = [normrnd(0,sigmaD^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
+    x_distd = store_nlmstate(:,tk-1) + x_dist*(tk>20);
+    
     % Simulate a NLM step
-    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_prev_noisy_nl,u_SOM,NLM); 
+    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_distd,u_SOM,NLM); 
     
     % Convert back to global axis
     pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nSOM^2), [nSOM^2,3]);
     vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nSOM^2):6*nSOM^2), [nSOM^2,3]); 
     pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nSOM^2,1]);
     vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nSOM^2,1]);
-        
-    % Close the loop
-    [phired, dphired] = take_reduced_mesh(pos_nxt_SOM,vel_nxt_SOM, nSOM, nCOM);
-    x_ini_COM = [phired; dphired];
     
     % Get new Cloth orientation (rotation matrix)
     cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
@@ -362,6 +371,7 @@ for tk=2:nPtRef
     % Store things
     store_somstate(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
     store_nlmstate(:,tk) = [pos_nxt_NLM; vel_nxt_NLM];
+    store_nlmnoisy(:,tk) = x_noisy_nl;
     store_u(:,tk) = u_lin;
     
     if(mod(tk,printX)==0)

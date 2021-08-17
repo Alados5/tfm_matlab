@@ -34,8 +34,8 @@ W_T = 0.42;
 W_R = 0.14;
 
 % Noise parameters
-sigmaD = 0.020;
-sigmaN = 0.050;
+sigmaD = 0.020; %0.020
+sigmaN = 0.050; %0.050
 % -------------------
 
 
@@ -160,8 +160,8 @@ u = SX.sym('u',6);
 x_next = SX.sym('xdot',6*COM.row*COM.col);
 x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 
-% (x,u)->(x_next)
-stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
+% NL Map: (x,u)->(x_next)
+stfun = Function('stfun',{x,u},{x_next});
 
 % Lower corner coordinates for both models
 coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 

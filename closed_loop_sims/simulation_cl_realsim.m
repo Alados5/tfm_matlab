@@ -169,8 +169,8 @@ u = SX.sym('u',6);
 x_next = SX.sym('xdot',6*COM.row*COM.col);
 x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 
-% (x,u)->(x_next)
-stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
+% NL Map: (x,u)->(x_next)
+stfun = Function('stfun',{x,u},{x_next});
 
 % Lower corner coordinates for both models
 coord_lcC = [1 nCOM 1+nCOM^2 nCOM^2+nCOM 2*nCOM^2+1 2*nCOM^2+nCOM]; 
@@ -312,8 +312,8 @@ for tk=2:nPtRef
     [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
                                        x_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
                                        nNLM, nSOM);
-    x_prev_noisy = [phi_noisy; dphi_noisy];
-    somst_wavg = x_prev_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
+    x_noisy = [phi_noisy; dphi_noisy];
+    somst_wavg = x_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
     
     % The last Hp timesteps, trajectory should remain constant
     if tk>=nPtRef-Hp 

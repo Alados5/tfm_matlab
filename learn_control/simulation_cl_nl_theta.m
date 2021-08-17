@@ -10,7 +10,8 @@ if nargin < 2
     NTraj = 6;
     Ts = 0.020;
     Hp = 25;
-    sigmaX = 0;
+    sigmaD = 0;
+    sigmaN = 0;
     nCOM = 4;
     nSOM = 4;
     paramsCOM = [-300 -10 -225  -4 -2.5 -4 0.03];
@@ -19,7 +20,8 @@ else
     NTraj = opts.NTraj;
     Ts = opts.Ts;
     Hp = opts.Hp;
-    sigmaX = opts.sigmaX;
+    sigmaD = opts.sigmaD;
+    sigmaN = opts.sigmaN;
     nCOM = opts.nCOM;
     nSOM = opts.nSOM;
     paramsCOM = opts.paramsCOM;  
@@ -110,12 +112,12 @@ u = SX.sym('u',6);
 x_next = SX.sym('xdot',6*COM.row*COM.col);
 x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
 
-% (x,u)->(x_next)
-stfun = Function('stfun',{x,u},{x_next}); % nonlinear mapping function f(x,u)
+% NL Map: (x,u)->(x_next)
+stfun = Function('stfun',{x,u},{x_next});
 
 % Lower corner coordinates for both models
-coord_l  = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
-coord_nl = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
+coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
+coord_lcS = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
 
 % Parameters in the optimization problem: initial state and reference
 P = SX.sym('P',n_states,Hp+1); 
@@ -134,9 +136,9 @@ Xk = P(:,1);
 
 % Weigths calculation (adaptive): direction pointing from the actual
 % lower corner position to the desired position at the end of the interval
-ln = P([1 3 5],end) - Xk(coord_l([1,3,5])); %ln = left node
+ln = P([1 3 5],end) - Xk(coord_lcC([1,3,5])); %ln = left node
 ln = abs(ln)./(norm(ln)+10^-6);
-rn = P([2,4,6],end) - Xk(coord_l([2,4,6])); %rn = right node
+rn = P([2,4,6],end) - Xk(coord_lcC([2,4,6])); %rn = right node
 rn = abs(rn)./(norm(rn)+10^-6);
 Q = diag([ln(1) rn(1) ln(2) rn(2) ln(3) rn(3)]);
 
@@ -173,7 +175,7 @@ for k = 1:Hp
     
     % Integrate until the end of the interval
     Xk_next = stfun(Xk,Uk);
-    Xkn_r = Xk_next(coord_l);
+    Xkn_r = Xk_next(coord_lcC);
     
     % Constant distance between upper corners
     Xkn_u = Xk_next(COM.coord_ctrl);
@@ -225,6 +227,7 @@ Rcloth = [cloth_x cloth_y cloth_z];
 % Initialize storage
 reference = zeros(6*COM.row*COM.col, Hp+1);
 store_state(:,1) = x_ini_SOM;
+store_noisy(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
 
 tT0 = tic;
@@ -296,17 +299,24 @@ for tk=2:nPtRef
     cloth_z = cloth_z/norm(cloth_z);
     Rcloth = [cloth_x cloth_y cloth_z];
     
-    % Simulate a step of the SOM
-    x_noise = [normrnd(0,sigmaX^2,[3*nSOM^2,1]); zeros(3*nSOM^2,1)];
-    x_prev_noisy = store_state(:,tk-1) + x_noise;
-    [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_prev_noisy,u_SOM,SOM); 
+    % Add disturbance to SOM positions
+    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_distd = store_state(:,tk-1) + x_dist*(tk>20);
     
-    % Close the loop (update COM)
-    [phired, dphired] = take_reduced_mesh(pos_nxt_SOM,vel_nxt_SOM, nSOM, nCOM);
+    % Simulate a step of the SOM
+    [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_distd,u_SOM,SOM); 
+    
+    % Add sensor noise to positions
+    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
+    pos_noisy = pos_nxt_SOM + pos_noise*(tk>20);
+    
+    % Get COM states from SOM (Close the loop)
+    [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);
     x_ini_COM = [phired; dphired];
     
     % Store things
     store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
+    store_noisy(:,tk) = [pos_noisy; vel_nxt_SOM];
     store_u(:,tk) = u_lin;
     
     % Display progress
@@ -323,8 +333,8 @@ fprintf([' -- Total time: \t',num2str(tT),' s \n', ...
 
 
 %% KPI and Reward
-error_l = 1000*(store_state(coord_nl([1,3,5]),:)'-Ref_l);
-error_r = 1000*(store_state(coord_nl([2,4,6]),:)'-Ref_r);
+error_l = 1000*(store_state(coord_lcS([1,3,5]),:)'-Ref_l);
+error_r = 1000*(store_state(coord_lcS([2,4,6]),:)'-Ref_r);
 
 eMAE = mean(abs([error_l error_r]));
 eRMSE = sqrt(mean([error_l error_r].^2));
@@ -341,9 +351,10 @@ end
 
 %% SAVE DATA
 AllData = struct();
-AllData.xSOM = store_state;
-AllData.uSOM = store_state(SOM.coord_ctrl,:);
-AllData.ulin = store_u;
+AllData.xSOM  = store_state;
+AllData.xSOMn = store_noisy;
+AllData.uSOM  = store_state(SOM.coord_ctrl,:);
+AllData.ulin  = store_u;
 
 
 end
