@@ -254,6 +254,16 @@ solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 %% MAIN SIMULATION LOOP EXECUTION %%
 %----------------------------------%
 
+% Initial info
+fprintf(['Executing Reference Trajectory: ',num2str(NTraj), ...
+         ' (',num2str(nPtRef),' pts) \n', ...
+         'Ts = ',num2str(Ts*1000),' ms \t\t Hp = ',num2str(Hp),'\n', ...
+         'nSOM = ',num2str(nSOM),' \t\t nCOM = ',num2str(nCOM),'\n', ...
+         'lCloth = ',num2str(lCloth),' m \t aCloth = ',num2str(aCloth), ...
+         ' rad \t cCloth = [', num2str(cCloth(1)), ', ' ...
+         num2str(cCloth(2)),', ',num2str(cCloth(3)),'] m \n', ...
+         '---------------------------------------------------------------\n']);
+
 % Initialize control
 u_ini = x_ini_SOM(SOM.coord_ctrl);
 u_bef = u_ini;
@@ -357,7 +367,7 @@ for tk=2:nPtRef
     pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nxS*nyS,1]);
     vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
     
-    % Add sensor (vision) noise to position before closing loop
+    % Add disturbance
     pos_noise = normrnd(0,sigmaX^2,[n_states/2,1]);
     pos_nxt_noisy = pos_nxt_SOM + Wv*pos_noise;
         

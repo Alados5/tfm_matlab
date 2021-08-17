@@ -19,7 +19,6 @@ animwWAM = 0;
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
-Wv = 0.2;
 nSOM = 4;
 nCOM = 4;
 ExpSetN = 4;
@@ -249,6 +248,16 @@ solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 %% MAIN SIMULATION LOOP EXECUTION %%
 %----------------------------------%
 
+% Initial info
+fprintf(['Executing Reference Trajectory: ',num2str(NTraj), ...
+         ' (',num2str(nPtRef),' pts) \n', ...
+         'Ts = ',num2str(Ts*1000),' ms \t\t Hp = ',num2str(Hp),'\n', ...
+         'nSOM = ',num2str(nSOM),' \t\t nCOM = ',num2str(nCOM),'\n', ...
+         'lCloth = ',num2str(lCloth),' m \t aCloth = ',num2str(aCloth), ...
+         ' rad \t cCloth = [', num2str(cCloth(1)), ', ' ...
+         num2str(cCloth(2)),', ',num2str(cCloth(3)),'] m \n', ...
+         '---------------------------------------------------------------\n']);
+
 % Initialize control
 u_ini = x_ini_SOM(SOM.coord_ctrl);
 u_bef = u_ini;
@@ -352,10 +361,9 @@ for tk=2:nPtRef
     PoseTCP.position = (u_SOM([1 3 5]) + u_SOM([2 4 6]))' / 2 + TCPOffset';
     PoseTCP.orientation = rotm2quat(Rtcp);
     
-    % Add sensor noise and replace SOMstate (eq. to "Spin once")
+    % Add disturbance
     x_noise = [normrnd(0,sigmaX^2,[n_states/2,1]); zeros(n_states/2,1)];
     x_noisy = store_state(:,tk-1) + x_noise;
-    x_wavg  = x_noisy*Wv + store_state(:,tk-1)*(1-Wv);
 
     % Simulate a step of the SOM
     [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_noisy,u_SOM,SOM); 

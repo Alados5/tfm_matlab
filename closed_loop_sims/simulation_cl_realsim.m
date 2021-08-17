@@ -15,7 +15,7 @@ plotAnim = 0;
 animwWAM = 0;
 
 % General Parameters
-NTraj = 10;
+NTraj = 6;
 Ts = 0.020;
 Hp = 25;
 Wv = 0.2;
@@ -25,7 +25,7 @@ nNLM = 10;
 ExpSetN = 4;
 NExp = 8;
 NTrial = 2;
-zsum0 = +0.01;
+zsum0 = 0*+0.01;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
@@ -37,7 +37,7 @@ W_T = 1;
 W_R = 10;
 
 % Noise parameters
-sigmaX = 0.075;
+sigmaX = 0.07;
 
 % -------------------
 
@@ -259,6 +259,18 @@ solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 %% MAIN SIMULATION LOOP EXECUTION %%
 %----------------------------------%
 
+% Initial info
+fprintf(['Executing Reference Trajectory: ',num2str(NTraj), ...
+         ' (',num2str(nPtRef),' pts) \n', ...
+         'Ts = ',num2str(Ts*1000),' ms \t\t Hp = ',num2str(Hp), ...
+         '\t \t \t Wv = ', num2str(Wv*100), '%% \n', ...
+         'nSOM = ',num2str(nSOM),' \t\t nCOM = ',num2str(nCOM), ...
+         '\t \t \t nNLM = ', num2str(nNLM), '\n', ...
+         'lCloth = ',num2str(lCloth),' m \t aCloth = ',num2str(aCloth), ...
+         ' rad \t cCloth = [', num2str(cCloth(1)), ', ' ...
+         num2str(cCloth(2)),', ',num2str(cCloth(3)),'] m \n', ...
+         '---------------------------------------------------------------\n']);
+
 % Initialize control
 u_ini = x_ini_SOM(SOM.coord_ctrl);
 u_bef = u_ini;
@@ -294,7 +306,7 @@ for tk=2:nPtRef
     
     % Get new feedback value (eq. to "Spin once")
     x_noise_nl = [normrnd(0,sigmaX^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl;
+    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>10);
     
     [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
                                        x_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
@@ -516,8 +528,10 @@ fig2.Color = [1,1,1];
 fig2.Units = 'normalized';
 fig2.Position = [0 0 0.5 0.9];
 
+plot_nlevo = store_nlmnoisy;
+
 subplot(15,2,1:2:12);
-plot(time, store_nlmnoisy(NLM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
+plot(time, plot_nlevo(NLM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
 title('\textbf{Left upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -526,7 +540,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,2:2:12);
-plot(time, store_nlmnoisy(NLM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
+plot(time, plot_nlevo(NLM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
 title('\textbf{Right upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -535,7 +549,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,17:2:28);
-plot(time, store_nlmnoisy(coord_lcNL([1 3 5]),:)', 'linewidth',1.5);
+plot(time, plot_nlevo(coord_lcNL([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time, Ref_l, '--k', 'linewidth',1.2);
 hold off
@@ -547,7 +561,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,18:2:28);
-pa2som = plot(time, store_nlmnoisy(coord_lcNL([2 4 6]),:)', 'linewidth',1.5);
+pa2som = plot(time, plot_nlevo(coord_lcNL([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
 hold off
@@ -712,8 +726,8 @@ fig4.Position = [0.5 0 0.5 0.90];
 
 NLM_ctrl = NLM.coord_ctrl(1:2);
 NLM_lowc = coord_lcNL(1:2);
-store_nlmpos = store_nlmnoisy(1:3*nNLM^2,:);
-All_uNLM = store_nlmnoisy(NLM.coord_ctrl,:);
+store_nlmpos = plot_nlevo(1:3*nNLM^2,:);
+All_uNLM = plot_nlevo(NLM.coord_ctrl,:);
 
 store_nlmx = store_nlmpos(1:nNLM^2,:);
 store_nlmy = store_nlmpos(nNLM^2+1:2*nNLM^2,:);

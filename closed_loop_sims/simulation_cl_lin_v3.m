@@ -253,6 +253,16 @@ solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 %% MAIN SIMULATION LOOP EXECUTION %%
 %----------------------------------%
 
+% Initial info
+fprintf(['Executing Reference Trajectory: ',num2str(NTraj), ...
+         ' (',num2str(nPtRef),' pts) \n', ...
+         'Ts = ',num2str(Ts*1000),' ms \t\t Hp = ',num2str(Hp),'\n', ...
+         'nSOM = ',num2str(nSOM),' \t\t nCOM = ',num2str(nCOM),'\n', ...
+         'lCloth = ',num2str(lCloth),' m \t aCloth = ',num2str(aCloth), ...
+         ' rad \t cCloth = [', num2str(cCloth(1)), ', ' ...
+         num2str(cCloth(2)),', ',num2str(cCloth(3)),'] m \n', ...
+         '---------------------------------------------------------------\n']);
+     
 % Initialize control
 u_ini = x_ini_SOM(SOM.coord_ctrl);
 u_bef = u_ini;
@@ -338,10 +348,11 @@ for tk=2:nPtRef
     u_SOM = u_lin+u_bef;
     u_bef = u_SOM;
     
-    % Linear SOM uses local variables too (rot)
+    % Add disturbance
     x_noise = [normrnd(0,sigmaX^2,[n_states/2,1]); zeros(n_states/2,1)];
     x_prev_noisy = store_state(:,tk-1) + x_noise;
     
+    % Linear SOM uses local variables too (rot)
     pos_ini_SOM = reshape(x_prev_noisy(1:3*nxS*nyS), [nxS*nyS,3]);
     vel_ini_SOM = reshape(x_prev_noisy(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
