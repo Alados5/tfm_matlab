@@ -29,8 +29,8 @@ zsum0 = +0.01;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
-xbound = 1;
-ubound = 5*1e-3;
+xbound = 1.5;
+ubound = 10*1e-3;
 gbound = 0;  % 0 -> Equality constraint
 W_Q = 1;
 W_T = 1;
@@ -282,6 +282,7 @@ tcp_ini = (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2 + (Rcloth*TCPOffset_local)';
 reference = zeros(6*COM.row*COM.col, Hp+1);
 store_somstate(:,1) = x_ini_SOM;
 store_nlmstate(:,1) = x_ini_NLM;
+store_nlmnoisy(:,1) = x_ini_NLM;
 store_u(:,1) = zeros(6,1);
 store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
@@ -293,13 +294,13 @@ for tk=2:nPtRef
     
     % Get new feedback value (eq. to "Spin once")
     x_noise_nl = [normrnd(0,sigmaX^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_prev_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl;
+    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl;
     
-    [phi_noisy, dphi_noisy] = take_reduced_mesh(x_prev_noisy_nl(1:3*nNLM^2), ...
-                                      x_prev_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
-                                      nNLM, nSOM);
+    [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
+                                       x_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
+                                       nNLM, nSOM);
     x_prev_noisy = [phi_noisy; dphi_noisy];
-    x_prev_wavg = x_prev_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
+    somst_wavg = x_prev_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
     
     % The last Hp timesteps, trajectory should remain constant
     if tk>=nPtRef-Hp 
@@ -309,6 +310,12 @@ for tk=2:nPtRef
         Traj_l_Hp = Ref_l(tk:tk+Hp-1,:);
         Traj_r_Hp = Ref_r(tk:tk+Hp-1,:);
     end
+    
+    % Get COM states from SOM (Close the loop)
+    [phired, dphired] = take_reduced_mesh(somst_wavg(1:n_states/2), ...
+                                          somst_wavg(n_states/2+1:n_states), ...
+                                          nSOM, nCOM);
+    x_ini_COM = [phired; dphired];
     
     % Rotate initial position to cloth base
     pos_ini_COM = reshape(x_ini_COM(1:3*nCOM^2),[nCOM^2,3]);
@@ -356,8 +363,8 @@ for tk=2:nPtRef
     u_bef = u_SOM;
     
     % Linear SOM uses local variables too (rot)
-    pos_ini_SOM = reshape(x_prev_wavg(1:3*nSOM^2), [nSOM^2,3]);
-    vel_ini_SOM = reshape(x_prev_wavg(3*nSOM^2+1:6*nSOM^2), [nSOM^2,3]);
+    pos_ini_SOM = reshape(somst_wavg(1:3*nSOM^2), [nSOM^2,3]);
+    vel_ini_SOM = reshape(somst_wavg(3*nSOM^2+1:6*nSOM^2), [nSOM^2,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
     vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
     x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nSOM^2,1]);
@@ -367,17 +374,13 @@ for tk=2:nPtRef
     next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
     
     % Simulate a NLM step
-    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_prev_noisy_nl,u_SOM,NLM); 
+    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(store_nlmstate(:,tk-1),u_SOM,NLM); 
     
     % Convert back to global axis
     pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nSOM^2), [nSOM^2,3]);
     vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nSOM^2):6*nSOM^2), [nSOM^2,3]); 
     pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nSOM^2,1]);
     vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nSOM^2,1]);
-        
-    % Close the loop
-    [phired, dphired] = take_reduced_mesh(pos_nxt_SOM,vel_nxt_SOM, nSOM, nCOM);
-    x_ini_COM = [phired; dphired];
     
     % Get new Cloth orientation (rotation matrix)
     cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
@@ -399,6 +402,7 @@ for tk=2:nPtRef
     % Store things
     store_somstate(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
     store_nlmstate(:,tk) = [pos_nxt_NLM; vel_nxt_NLM];
+    store_nlmnoisy(:,tk) = x_noisy_nl;
     store_u(:,tk) = u_lin;
     store_pose(tk) = PoseTCP;
     
@@ -513,7 +517,7 @@ fig2.Units = 'normalized';
 fig2.Position = [0 0 0.5 0.9];
 
 subplot(15,2,1:2:12);
-plot(time, store_nlmstate(NLM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
+plot(time, store_nlmnoisy(NLM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
 title('\textbf{Left upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -522,7 +526,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,2:2:12);
-plot(time, store_nlmstate(NLM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
+plot(time, store_nlmnoisy(NLM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
 title('\textbf{Right upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -531,7 +535,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,17:2:28);
-plot(time, store_nlmstate(coord_lcNL([1 3 5]),:)', 'linewidth',1.5);
+plot(time, store_nlmnoisy(coord_lcNL([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time, Ref_l, '--k', 'linewidth',1.2);
 hold off
@@ -543,7 +547,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,18:2:28);
-pa2som = plot(time, store_nlmstate(coord_lcNL([2 4 6]),:)', 'linewidth',1.5);
+pa2som = plot(time, store_nlmnoisy(coord_lcNL([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
 hold off
@@ -708,8 +712,8 @@ fig4.Position = [0.5 0 0.5 0.90];
 
 NLM_ctrl = NLM.coord_ctrl(1:2);
 NLM_lowc = coord_lcNL(1:2);
-store_nlmpos = store_nlmstate(1:3*nNLM^2,:);
-All_uNLM = store_nlmstate(NLM.coord_ctrl,:);
+store_nlmpos = store_nlmnoisy(1:3*nNLM^2,:);
+All_uNLM = store_nlmnoisy(NLM.coord_ctrl,:);
 
 store_nlmx = store_nlmpos(1:nNLM^2,:);
 store_nlmy = store_nlmpos(nNLM^2+1:2*nNLM^2,:);
