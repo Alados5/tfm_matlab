@@ -17,7 +17,6 @@ animwWAM = 0;
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
-Wv = 0.2;
 nSOM = 4;
 nCOM = 4;
 ExpSetN = 4;
@@ -30,13 +29,13 @@ TCPOffset_local = [0; 0; 0.09];
 xbound = 1.5;
 ubound = 10*1e-3;
 gbound = 0*1e-3; % 0 -> Equality constraint
-W_Q = 1;    %1
-W_T = 0.42; %1
-W_R = 0.14; %10
+W_Q = 1;
+W_T = 0.42;
+W_R = 0.14;
 
 % Noise parameters
-sigmaX = 0.15;
-
+sigmaD = 0.020;
+sigmaN = 0.050;
 % -------------------
 
 
@@ -350,9 +349,13 @@ for tk=2:nPtRef
     u_SOM = u_lin+u_bef;
     u_bef = u_SOM;
     
+    % Add disturbance to SOM positions
+    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_distd = store_state(:,tk-1) + x_dist*(tk>20);
+    
     % Linear SOM uses local variables too (rot)  
-    pos_ini_SOM = reshape(store_state(1:3*nxS*nyS,tk-1), [nxS*nyS,3]);
-    vel_ini_SOM = reshape(store_state(3*nxS*nyS+1:6*nxS*nyS,tk-1), [nxS*nyS,3]);
+    pos_ini_SOM = reshape(x_distd(1:3*nxS*nyS), [nxS*nyS,3]);
+    vel_ini_SOM = reshape(x_distd(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
     vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
     x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
@@ -368,11 +371,11 @@ for tk=2:nPtRef
     vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
     
     % Add sensor noise to positions
-    pos_noise = normrnd(0,sigmaX^2,[n_states/2,1]);
-    pos_nxt_noisy = pos_nxt_SOM + Wv*pos_noise;
+    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
+    pos_noisy = pos_nxt_SOM + pos_noise*(tk>20);
         
-    % Close the loop
-    [phired, dphired] = take_reduced_mesh(pos_nxt_noisy,vel_nxt_SOM, nSOM, nCOM);
+    % Get COM states from SOM (Close the loop)
+    [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);
     x_ini_COM = [phired; dphired];
     
     % Get new Cloth orientation (rotation matrix)
@@ -394,7 +397,7 @@ for tk=2:nPtRef
     
     % Store things
     store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
-    store_noisy(:,tk) = [pos_nxt_noisy; vel_nxt_SOM];
+    store_noisy(:,tk) = [pos_noisy; vel_nxt_SOM];
     store_u(:,tk) = u_lin;
     store_pose(tk) = PoseTCP;
     
@@ -449,7 +452,8 @@ fprintf(['- Norm RMSE: \t', num2str(1000*eRMSEp),' mm\n']);
 
 
 %% PLOT CORNERS
-time = 0:Ts:size(store_state,2)*Ts-Ts;
+time = 0:Ts:nPtRef*Ts-Ts;
+plot_evo = store_state; %store_noisy | store_state 
 
 fig1 = figure(1);
 fig1.Color = [1,1,1];
@@ -457,7 +461,7 @@ fig1.Units = 'normalized';
 fig1.Position = [0.5 0 0.5 0.9];
 
 subplot(15,2,1:2:12);
-plot(time, store_state(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
+plot(time, plot_evo(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
 title('\textbf{Left upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -466,7 +470,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,2:2:12);
-plot(time, store_state(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
+plot(time, plot_evo(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
 title('\textbf{Right upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -475,7 +479,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,17:2:28);
-plot(time, store_state(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
+plot(time, plot_evo(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time, Ref_l, '--k', 'linewidth',1.2);
 hold off
@@ -487,7 +491,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,18:2:28);
-pa1som = plot(time, store_state(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
+pa1som = plot(time, plot_evo(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
 hold off
@@ -516,8 +520,8 @@ wampov = [-50 30];
 
 SOM_ctrl = SOM.coord_ctrl(1:2);
 SOM_lowc = coord_lcS(1:2);
-store_pos = store_state(1:3*SOMlength,:);
-All_uSOM = store_state(SOM.coord_ctrl,:);
+store_pos = plot_evo(1:3*SOMlength,:);
+All_uSOM = plot_evo(SOM.coord_ctrl,:);
 TCP_pos = reshape([store_pose.position],[3,size(Ref_l,1)])';
 TCP_q   = reshape([store_pose.orientation],[4,size(Ref_l,1)])';
 TCP_rot = quat2rotm(TCP_q);
@@ -567,7 +571,7 @@ if(plotAnim > 0)
     end
     
     pause(1);
-    for t=2:size(store_state,2)
+    for t=2:nPtRef
 
         scatter3(store_x(:,t), store_y(:,t), store_z(:,t), '.b');
         hold on

@@ -18,7 +18,7 @@ animwWAM = 0;
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
-Wv = 0.2;
+Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
 nNLM = 10;
@@ -32,12 +32,13 @@ TCPOffset_local = [0; 0; 0.09];
 xbound = 1.5;
 ubound = 10*1e-3;
 gbound = 0;  % 0 -> Equality constraint
-W_Q = 1;
-W_T = 1;
-W_R = 10;
+W_Q = 0.2;
+W_T = 0.2;
+W_R = 1;
 
 % Noise parameters
-sigmaX = 0.07;
+sigmaD = 0.020;
+sigmaN = 0.050;
 
 % -------------------
 
@@ -304,9 +305,9 @@ t0 = tic;
 printX = 50;
 for tk=2:nPtRef
     
-    % Get new feedback value (eq. to "Spin once")
-    x_noise_nl = [normrnd(0,sigmaX^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>10);
+    % Get new noisy feedback value (eq. to "Spin once")
+    x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
+    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>20);
     
     [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
                                        x_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
@@ -385,8 +386,12 @@ for tk=2:nPtRef
     % Simulate a SOM step
     next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
     
+    % Add disturbance to NLM positions
+    x_dist = [normrnd(0,sigmaD^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
+    x_distd = store_nlmstate(:,tk-1) + x_dist*(tk>20);
+    
     % Simulate a NLM step
-    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(store_nlmstate(:,tk-1),u_SOM,NLM); 
+    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_distd,u_SOM,NLM); 
     
     % Convert back to global axis
     pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nSOM^2), [nSOM^2,3]);
@@ -426,8 +431,11 @@ for tk=2:nPtRef
     end
 end
 tT = toc(tT0);
+fprintf(['-----------------------------------------\n', ...
+         ' -- Total time: \t',num2str(tT),' s \n', ...
+         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
+
 time = 0:Ts:size(store_somstate,2)*Ts-Ts;
-fprintf(['Total time: ',num2str(tT),' s \n']);
 
 
 %% KPI
