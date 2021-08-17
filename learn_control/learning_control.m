@@ -2,7 +2,7 @@ close all; clc; clear;
 
 %% Initialization
 ExpSetN = 1;
-SimType = 'NL'; %LIN, NL, RTM
+SimType = 'RTM'; %LIN, NL, RTM
 ExpSetNote = '';
 NTraj = 6;
 Ts = 0.020;
@@ -16,7 +16,7 @@ nNLM = 10;
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
-e0 = 45;
+e0 = 20;
 minRwd = -100;
 NSamples = 10;
 NEpochs = 5;
