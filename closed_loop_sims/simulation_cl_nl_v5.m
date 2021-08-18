@@ -167,6 +167,7 @@ ubg = [];
 
 % Initial condition (initial state)
 Xk = P(:,1);
+Ukp = 0;
 
 % Weigths calculation (adaptive): direction pointing from the actual
 % lower corner position to the desired position at the end of the interval
@@ -217,10 +218,15 @@ for k = 1:Hp
     lbg = [lbg; -gbound-1e-6];
     ubg = [ubg;  gbound+1e-6];
     
+    % Slew Rate (Dx Dx Dy Dy Dz Dz)
+    DUk = Uk - Ukp;
+    Ukp = Uk;
+    
     % Update objective function
     obj = obj + W_Q*(Xkn_r-r_a)'*Q*(Xkn_r-r_a);
     obj = obj + W_T*(P(1:6,k+1)-r_a)'*(P(1:6,k+1)-r_a);
-    obj = obj + W_R*(Uk'*Uk);
+    %obj = obj + W_R*(Uk'*Uk);
+    obj = obj + W_R*(DUk'*DUk);
 
     Xk = Xk_next;
 end
