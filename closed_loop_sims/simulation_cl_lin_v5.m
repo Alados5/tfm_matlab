@@ -288,7 +288,7 @@ Rtcp = [cloth_y cloth_x -cloth_z];
 % TCP initial position
 tcp_ini = (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2 + (Rcloth*TCPOffset_local)';
 
-% Initialize things
+% Initialize storage
 reference = zeros(6*COM.row*COM.col, Hp+1);
 store_state(:,1) = x_ini_SOM;
 store_noisy(:,1) = x_ini_SOM;
@@ -332,9 +332,15 @@ for tk=2:nPtRef
     reference(5,2:end) = Traj_l_Hp_rot(:,3)';
     reference(6,2:end) = Traj_r_Hp_rot(:,3)';
     
-    % Initial seed of the optimization (for "u" and "r^a")
-    % Add cloth size to z for LC->UC
-    args_x0 = repmat([reference(1:6,end)+[0;0;0;0;lCloth;lCloth];zeros(6,1)],Hp,1);
+    % Initial seed of the optimization (for w -> r_a and u)
+    % - Copy reference for lower corners (r_a)
+    % - Controls are increments, assume LC=UC for initial guess
+    args_x0 = zeros(12*Hp,1);
+    args_x0(take_x) = reference(1:6,2:end);
+    args_x0(take_u) = [reshape(diff(reference(1:6,2:end),1,2),6*(Hp-1),1); zeros(6,1)];
+    
+    % Old version
+    %args_x0 = repmat([reference(1:6,end)+[0;0;0;0;lCloth;lCloth];zeros(6,1)],Hp,1);
     
     % Find the solution "sol"
     sol = solver('x0', args_x0, 'lbx', lbw, 'ubx', ubw, ...
