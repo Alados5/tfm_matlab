@@ -9,19 +9,21 @@ minRwd = -1000;
 SizeSOM = 10;
 SizeCOM = 4;
 Ts = 0.015;
-e0 = 20;
 
+e0 = 20;
 NSamples = 50;
 NEpochs = 20;
 
 Plot3DTraj = 0;
 Plot2DTraj = 1;
 
+ExpSetN = str2double(ExpSet(1:strfind(ExpSet,'_')-1));
+
 % OL Options
 opts = struct();
 opts.nCOM = SizeCOM;
 opts.Ts = Ts;
-opts.ExpSetN = str2double(ExpSet(1:strfind(ExpSet,'_')-1));
+opts.ExpSetN = ExpSetN;
 opts.NExp = NExp;
 opts.NTrial = NTrial;
 % NL SOM Model options
@@ -390,7 +392,7 @@ elseif (size(LUT_Exp,1) == 1)
 else
     % Add experiment row
     LUT_row = size(ThetaLUT,1)+1;
-    ThetaLUT(LUT_row,'ExpSetN') = {str2double(ExpSet(1))};
+    ThetaLUT(LUT_row,'ExpSetN') = {ExpSetN};
     ThetaLUT(LUT_row,'ExpSetName') = {ExpSet};
     ThetaLUT(LUT_row,'ExpDate') = {ExpDate};
     ThetaLUT(LUT_row,'NExp') = {NExp};
