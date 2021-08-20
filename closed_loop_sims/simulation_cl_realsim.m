@@ -39,8 +39,7 @@ W_R = 1;
 % Noise parameters
 sigmaD = 0.020; %0.020;
 sigmaN = 0.050; %0.050;
-
-% -------------------
+% ---------------------
 
 
 % Load trajectory to follow
@@ -176,29 +175,27 @@ stfun = Function('stfun',{x,u},{x_next});
 coord_lcC = [1 nCOM 1+nCOM^2 nCOM^2+nCOM 2*nCOM^2+1 2*nCOM^2+nCOM]; 
 coord_lcS = [1 nSOM 1+nSOM^2 nSOM^2+nSOM 2*nSOM^2+1 2*nSOM^2+nSOM];
 
-% Parameters in the optimization problem: initial state and reference
-P = SX.sym('P',n_states,Hp+1); 
+% Initial parameters of the optimization problem
+P   = SX.sym('P', 2+6, max(n_states, Hp)); 
+Xk  = P(1,:)';
+Ukp = P(2,1:6)';
+Rp  = P(2+(1:6),1:Hp);
 
-% Start with an empty NLP
-w=[]; %variables to optimize
-lbw = []; %lower bounds
-ubw = []; %upper bounds
-obj = 0; %objective function
-g=[]; %constraints
-lbg = [];
-ubg = [];
+% Initialize optimization variables
+w=[];       % Variables to optimize
+lbw = [];   % Lower bounds of w
+ubw = [];   % Upper bounds of w
+obj = 0;    % Objective function
+g=[];       % Constraints
+lbg = [];   % Lower bounds of g
+ubg = [];   % Upper bounds of g
 
-% Initial condition (initial state)
-Xk = P(:,1);
-Ukp = 0;
 
-% Weigths calculation (adaptive): direction pointing from the actual
-% lower corner position to the desired position at the end of the interval
-ln = P([1 3 5],end) - Xk(coord_lcC([1,3,5])); %ln = left node
-ln = abs(ln)./(norm(ln)+10^-6);
-rn = P([2,4,6],end) - Xk(coord_lcC([2,4,6])); %rn = right node
-rn = abs(rn)./(norm(rn)+10^-6);
-Q = diag([ln(1) rn(1) ln(2) rn(2) ln(3) rn(3)]);
+% Weigths calculation (adaptive):
+%   Pointing from the current LCpos to the desired at the horizon
+lc_dist = Rp(:,end) - Xk(coord_lcC);
+lc_dist = abs(lc_dist)/(norm(lc_dist)+1e-6);
+Q = diag(lc_dist);
 
 take_x=[];
 take_u=[];
@@ -215,7 +212,7 @@ for k = 1:Hp
     take_x=[take_x;(i:(i+6-1))'];
     i=i+6;
     
-    % New NLP variable for the control
+    % Variable for the control
     Uk = SX.sym(['U_' num2str(k)],6);
     w = [w; Uk];
     % The bounds of the control action are very relevant! 
@@ -243,7 +240,7 @@ for k = 1:Hp
     
     % Update objective function
     obj = obj + W_Q*(Xkn_r-r_a)'*Q*(Xkn_r-r_a);
-    obj = obj + W_T*(P(1:6,k+1)-r_a)'*(P(1:6,k+1)-r_a);
+    obj = obj + W_T*(Rp(:,k)-r_a)'*(Rp(:,k)-r_a);
     %obj = obj + W_R*(Uk'*Uk);
     obj = obj + W_R*(DUk'*DUk);
     
@@ -258,7 +255,7 @@ ubg = [ubg;  gbound*ones(6,1)];
 nlp_prob = struct('f', obj, 'x', w, 'g', g, 'p', P);
 opts = struct;
 opts.print_time = 0;
-opts.ipopt.print_level = 0; %0 to print the minimum, 3 to print the maximum
+opts.ipopt.print_level = 0; %0 min print - 3 max
 solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 
 
@@ -279,9 +276,11 @@ fprintf(['Executing Reference Trajectory: ',num2str(NTraj), ...
          '---------------------------------------------------------------\n']);
 
 % Initialize control
-u_ini = x_ini_SOM(SOM.coord_ctrl);
-u_bef = u_ini;
-u_SOM = u_ini;
+u_ini  = x_ini_SOM(SOM.coord_ctrl);
+u_lin  = zeros(6,1);
+u_rot1 = u_lin;
+u_bef  = u_ini;
+u_SOM  = u_ini;
 
 % Get Cloth orientation (rotation matrix)
 cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
@@ -309,7 +308,7 @@ while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
 end
 
 % Initialize storage
-reference = zeros(6*COM.row*COM.col, Hp+1);
+in_params = zeros(2+6, max(n_states, Hp));
 store_somstate(:,1) = x_ini_SOM;
 store_nlmstate(:,1) = x_ini_NLM;
 store_nlmnoisy(:,1) = x_ini_NLM;
@@ -334,11 +333,11 @@ for tk=2:nPtRef
     
     % The last Hp timesteps, trajectory should remain constant
     if tk>=nPtRef-Hp 
-        Traj_l_Hp = repmat(Ref_l(end,:), Hp,1);
-        Traj_r_Hp = repmat(Ref_r(end,:), Hp,1);
+        Ref_l_Hp = repmat(Ref_l(end,:), Hp,1);
+        Ref_r_Hp = repmat(Ref_r(end,:), Hp,1);
     else
-        Traj_l_Hp = Ref_l(tk:tk+Hp-1,:);
-        Traj_r_Hp = Ref_r(tk:tk+Hp-1,:);
+        Ref_l_Hp = Ref_l(tk:tk+Hp-1,:);
+        Ref_r_Hp = Ref_r(tk:tk+Hp-1,:);
     end
     
     % Get COM states from SOM (Close the loop)
@@ -357,28 +356,25 @@ for tk=2:nPtRef
                      reshape(vel_ini_COM_rot,[3*nCOM^2,1])];
                  
     % Rotate reference trajectory to cloth base
-    Traj_l_Hp_rot = (Rcloth^-1 * Traj_l_Hp')';
-    Traj_r_Hp_rot = (Rcloth^-1 * Traj_r_Hp')';
+    Ref_l_Hp_rot = (Rcloth^-1 * Ref_l_Hp')';
+    Ref_r_Hp_rot = (Rcloth^-1 * Ref_r_Hp')';
     
-    % Define reference in the prediction horizon (sliding window)
-    reference(:,1) = x_ini_COM_rot;
-    reference(1,2:end) = Traj_l_Hp_rot(:,1)';
-    reference(2,2:end) = Traj_r_Hp_rot(:,1)';
-    reference(3,2:end) = Traj_l_Hp_rot(:,2)';
-    reference(4,2:end) = Traj_r_Hp_rot(:,2)';
-    reference(5,2:end) = Traj_l_Hp_rot(:,3)';
-    reference(6,2:end) = Traj_r_Hp_rot(:,3)';
+    % Define input parameters for the optimizer (sliding window)
+    in_params(1,:) = x_ini_COM_rot';
+    in_params(2,1:6) = u_rot1';
+    in_params(2+[1,3,5],1:Hp) = Ref_l_Hp_rot';
+    in_params(2+[2,4,6],1:Hp) = Ref_r_Hp_rot';
     
     % Initial seed of the optimization (for w -> r_a and u)
     % - Copy reference for lower corners (r_a)
     % - Controls are increments, assume LC=UC for initial guess
     args_x0 = zeros(12*Hp,1);
-    args_x0(take_x) = reference(1:6,2:end);
-    args_x0(take_u) = [reshape(diff(reference(1:6,2:end),1,2),6*(Hp-1),1); zeros(6,1)];
+    args_x0(take_x) = in_params(2+(1:6),1:Hp);
+    args_x0(take_u) = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
     
     % Find the solution "sol"
     sol = solver('x0', args_x0, 'lbx', lbw, 'ubx', ubw, ...
-                 'lbg', lbg, 'ubg', ubg, 'p', reference);
+                 'lbg', lbg, 'ubg', ubg, 'p', in_params);
 
     % Get only controls from the solution
     % Control actions are upper corner displacements (incremental pos)
