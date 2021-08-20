@@ -4,9 +4,9 @@ close all; clc; clear;
 ExpSetN = 1;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpSetNote = '';
-NTraj = 6;
-Ts = 0.015;
-Hp = 30;
+NTraj = 13;
+Ts = 0.020;
+Hp = 25;
 Wv = 0.3;
 sigmaD = 0.0;
 sigmaN = 0.0;
@@ -17,7 +17,7 @@ nNLM = 10;
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
-e0 = 45;
+e0 = 20;
 minRwd = -100;
 NSamples = 10;
 NEpochs = 5;
@@ -220,10 +220,11 @@ save([dirname,'/TH_',epochrange,'.mat'],'TH');
 MW2D = permute(MW,[1,3,2]);
 RWMW = zeros(1, size(MW2D,2));
 
-fprintf('\nExecuting resulting means per epoch...\n-----------------------');
+fprintf(['\nExecuting resulting means per epoch...\n', ...
+         '----------------------------------------']);
 
 for epoch=1:size(MW2D,2)
-    fprintf(['\nEpoch: ', num2str(e0+epoch-1), '\t|']);
+    fprintf(['\nEpoch: ', num2str(e0+epoch-1), '\n']);
     theta = (MW2D(:,epoch).*ThMask)';
     if SimTypeN==2
         [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts);
