@@ -2,11 +2,10 @@
 Closed-loop simulation of an MPC applied to a cloth model
 Original linear model by David Parent
 Modified by Adria Luque so both COM and SOM are linear models,
-and then added the nonlinear model to simulate reality
+as a first step to adapt the code into C++ to apply it to the real robot
 %}
 clear; close all; clc;
 
-addpath('..\required_files\cloth_model_New_NL\')
 addpath('..\required_files\cloth_model_New_L\')
 addpath('..\required_files\casadi-toolbox')
 import casadi.*
@@ -18,10 +17,8 @@ animwWAM = 0;
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
-Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
-nNLM = 10;
 ExpSetN = 4;
 NExp = 8;
 NTrial = 2;
@@ -30,7 +27,7 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 ubound = 50*1e-3;
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.50;
+W_Q = 0.10;
 W_R = 1.00;
 opt_du = 1;
 opt_Qa = 0;
@@ -53,9 +50,12 @@ cCloth = (Ref_r(1,:) + Ref_l(1,:))/2 + [0 0 lCloth/2];
 aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
 % Define COM parameters
+nxC = nCOM;
+nyC = nCOM;
+COMlength = nxC*nyC;
 COM = struct;
-COM.row = nCOM;
-COM.col = nCOM;
+COM.row = nxC;
+COM.col = nyC;
 COM.mass = 0.1;
 COM.grav = 9.8;
 COM.dt = Ts;
@@ -89,16 +89,19 @@ COM.z_sum = thetaC(7);
 
 
 % Controlled coordinates (upper corners in x,y,z)
-COM_node_ctrl = [nCOM*(nCOM-1)+1, nCOM^2];
+COM_node_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
 COM.coord_ctrl = [COM_node_ctrl, ...
-                  COM_node_ctrl+nCOM^2, ...
-                  COM_node_ctrl+2*nCOM^2];
+                  COM_node_ctrl+nxC*nyC, ...
+                  COM_node_ctrl+2*nxC*nyC];
 
               
 % Define the SOM (LINEAR)
+nxS = nSOM;
+nyS = nSOM;
+SOMlength = nxS*nyS;
 SOM = struct;
-SOM.row = nSOM;
-SOM.col = nSOM;
+SOM.row = nxS;
+SOM.col = nyS;
 SOM.mass = 0.1;
 SOM.grav = 9.8;
 SOM.dt = Ts;
@@ -113,21 +116,21 @@ SOM.z_sum = thetaS(7);
 
 
 % Controlled coordinates (upper corners in x,y,z)
-SOM_node_ctrl = [nSOM*(nSOM-1)+1, nSOM^2];
-SOM.coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+nSOM^2 SOM_node_ctrl+2*nSOM^2];
+SOM_node_ctrl = [nxS*(nyS-1)+1, nxS*nyS];
+SOM.coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+nxS*nyS SOM_node_ctrl+2*nxS*nyS];
 
 % Define initial position of the nodes (needed for ext_force)
 % Second half is velocity (initial v=0)
-x_ini_SOM = [reshape(pos,[3*nSOM^2 1]); zeros(3*nSOM^2,1)];
+x_ini_SOM = [reshape(pos,[3*nxS*nyS 1]); zeros(3*nxS*nyS,1)];
 
 % Reduce initial SOM position to COM size if necessary
-[pos_rd,~] = take_reduced_mesh(x_ini_SOM(1:3*nSOM^2),x_ini_SOM(3*nSOM^2+1:6*nSOM^2), nSOM, nCOM);
-x_ini_COM = [pos_rd; zeros(3*nCOM^2,1)];
+[reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
+x_ini_COM = [reduced_pos; zeros(3*nxC*nyC,1)];
 
 % Rotate initial COM and SOM positions to XZ plane
 RCloth_ini = [cos(aCloth) -sin(aCloth) 0; sin(aCloth) cos(aCloth) 0; 0 0 1];
 posSOM_XZ = (RCloth_ini^-1 * pos')';
-posCOM = reshape(x_ini_COM(1:3*nCOM^2), [nCOM^2,3]);
+posCOM = reshape(x_ini_COM(1:3*nxC*nyC), [nxC*nyC,3]);
 posCOM_XZ = (RCloth_ini^-1 * posCOM')';
 
 % Initial position of the nodes
@@ -144,22 +147,11 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
 
-% Third model as a real cloth representation (NL)
-[NLM, pos_nl] = initialize_nl_model(lCloth,nNLM,cCloth,aCloth,Ts);
-x_ini_NLM = [reshape(pos_nl,[3*nNLM^2 1]); zeros(3*nNLM^2,1)];
-
-% Nonlinear model corner coordinates
-NLM_node_ctrl = [nNLM*(nNLM-1)+1, nNLM^2];
-NLM.coord_ctrl = [NLM_node_ctrl NLM_node_ctrl+nNLM^2 NLM_node_ctrl+2*nNLM^2];
-coord_lcNL = [1 nNLM 1+nNLM^2 nNLM^2+nNLM 2*nNLM^2+1 2*nNLM^2+nNLM]; 
-n_states_nl = 3*2*nNLM^2;
-
-
 %% Start casADi optimization problem
 
 % Lower corner coordinates for both models
-coord_lcC = [1 nCOM 1+nCOM^2 nCOM^2+nCOM 2*nCOM^2+1 2*nCOM^2+nCOM]; 
-coord_lcS = [1 nSOM 1+nSOM^2 nSOM^2+nSOM 2*nSOM^2+1 2*nSOM^2+nSOM];
+coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
+coord_lcS = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
 
 % Declare model variables
 x = [SX.sym('pos',3*nCOM^2,Hp+1);
@@ -201,7 +193,7 @@ end
 
 
 for k = 1:Hp
-
+    
     % Model Dynamics Constraint -> Definition
     x(:,k+1) = (A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM);
     
@@ -238,10 +230,8 @@ controller = nlpsol('ctrl_sol', 'ipopt', opt_prob, opt_config);
 % Initial info
 fprintf(['Executing Reference Trajectory: ',num2str(NTraj), ...
          ' (',num2str(nPtRef),' pts) \n', ...
-         'Ts = ',num2str(Ts*1000),' ms \t\t Hp = ',num2str(Hp), ...
-         '\t \t \t Wv = ', num2str(Wv*100), '%% \n', ...
-         'nSOM = ',num2str(nSOM),' \t\t nCOM = ',num2str(nCOM), ...
-         '\t \t \t nNLM = ', num2str(nNLM), '\n', ...
+         'Ts = ',num2str(Ts*1000),' ms \t\t Hp = ',num2str(Hp),'\n', ...
+         'nSOM = ',num2str(nSOM),' \t\t nCOM = ',num2str(nCOM),'\n', ...
          'lCloth = ',num2str(lCloth),' m \t aCloth = ',num2str(aCloth), ...
          ' rad \t cCloth = [', num2str(cCloth(1)), ', ' ...
          num2str(cCloth(2)),', ',num2str(cCloth(3)),'] m \n', ...
@@ -268,22 +258,10 @@ Rtcp = [cloth_y cloth_x -cloth_z];
 % TCP initial position
 tcp_ini = (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2 + (Rcloth*TCPOffset_local)';
 
-% Simulate some SOM steps to stabilize the NL model
-lastwarn('','');
-[p_ini_NLM, ~] = simulate_cloth_step(x_ini_NLM,u_SOM,NLM);
-[~, warnID] = lastwarn;
-while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
-    lastwarn('','');
-    [p_ini_NLM, ~] = simulate_cloth_step(x_ini_NLM,u_SOM,NLM);
-    [~, warnID] = lastwarn;
-    x_ini_NLM = [p_ini_NLM; zeros(3*nNLM^2,1)];
-end
-
 % Initialize storage
 in_params = zeros(2+6, max(n_states, Hp+1));
-store_somstate(:,1) = x_ini_SOM;
-store_nlmstate(:,1) = x_ini_NLM;
-store_nlmnoisy(:,1) = x_ini_NLM;
+store_state(:,1) = x_ini_SOM;
+store_noisy(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
 store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
@@ -292,16 +270,6 @@ tT0 = tic;
 t0 = tic;
 printX = 50;
 for tk=2:nPtRef
-    
-    % Get new noisy feedback value (eq. to "Spin once")
-    x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>10);
-    
-    [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
-                                       x_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
-                                       nNLM, nSOM);
-    x_noisy = [phi_noisy; dphi_noisy];
-    somst_wavg = x_noisy*Wv + store_somstate(:,tk-1)*(1-Wv);
     
     % The last Hp+1 timesteps, trajectory should remain constant
     if tk>=nPtRef-(Hp+1) 
@@ -312,26 +280,20 @@ for tk=2:nPtRef
         Ref_r_Hp = Ref_r(tk:tk+Hp,:);
     end
     
-    % Get COM states from SOM (Close the loop)
-    [phired, dphired] = take_reduced_mesh(somst_wavg(1:n_states/2), ...
-                                          somst_wavg(n_states/2+1:n_states), ...
-                                          nSOM, nCOM);
-    x_ini_COM = [phired; dphired];
-    
     % Rotate initial position to cloth base
-    pos_ini_COM = reshape(x_ini_COM(1:3*nCOM^2),[nCOM^2,3]);
-    vel_ini_COM = reshape(x_ini_COM(3*nCOM^2+1:6*nCOM^2),[nCOM^2,3]);
+    pos_ini_COM = reshape(x_ini_COM(1:3*nxC*nyC),[nxC*nyC,3]);
+    vel_ini_COM = reshape(x_ini_COM(3*nxC*nyC+1:6*nxC*nyC),[nxC*nyC,3]);
     
     pos_ini_COM_rot = (Rcloth^-1 * pos_ini_COM')';
     vel_ini_COM_rot = (Rcloth^-1 * vel_ini_COM')';
-    x_ini_COM_rot = [reshape(pos_ini_COM_rot,[3*nCOM^2,1]);
-                     reshape(vel_ini_COM_rot,[3*nCOM^2,1])];
+    x_ini_COM_rot = [reshape(pos_ini_COM_rot,[3*nxC*nyC,1]);
+                     reshape(vel_ini_COM_rot,[3*nxC*nyC,1])];
                  
     % Rotate reference trajectory to cloth base
     Ref_l_Hp_rot = (Rcloth^-1 * Ref_l_Hp')';
     Ref_r_Hp_rot = (Rcloth^-1 * Ref_r_Hp')';
     
-    % Define input parameters for the optimizer (sliding window)
+    % Define reference in the prediction horizon (sliding window)
     in_params(1,:) = x_ini_COM_rot';
     in_params(2,1:6) = u_rot1';
     in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
@@ -359,29 +321,34 @@ for tk=2:nPtRef
     u_SOM = u_lin+u_bef;
     u_bef = u_SOM;
     
-    % Linear SOM uses local variables too (rot)
-    pos_ini_SOM = reshape(somst_wavg(1:3*nSOM^2), [nSOM^2,3]);
-    vel_ini_SOM = reshape(somst_wavg(3*nSOM^2+1:6*nSOM^2), [nSOM^2,3]);
+    % Add disturbance to SOM positions
+    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_distd = store_state(:,tk-1) + x_dist*(tk>10);
+    
+    % Linear SOM uses local variables too (rot)  
+    pos_ini_SOM = reshape(x_distd(1:3*nxS*nyS), [nxS*nyS,3]);
+    vel_ini_SOM = reshape(x_distd(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
     vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
-    x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nSOM^2,1]);
-                     reshape(vel_ini_SOM_rot,[3*nSOM^2,1])];
+    x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
+                     reshape(vel_ini_SOM_rot,[3*nxS*nyS,1])];
     
-    % Simulate a SOM step
+    % Simulate a step
     next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
     
-    % Add disturbance to NLM positions
-    x_dist = [normrnd(0,sigmaD^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_distd = store_nlmstate(:,tk-1) + x_dist*(tk>10);
-    
-    % Simulate a NLM step
-    [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_distd,u_SOM,NLM); 
-    
     % Convert back to global axis
-    pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nSOM^2), [nSOM^2,3]);
-    vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nSOM^2):6*nSOM^2), [nSOM^2,3]); 
-    pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nSOM^2,1]);
-    vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nSOM^2,1]);
+    pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nxS*nyS), [nxS*nyS,3]);
+    vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nxS*nyS):6*nxS*nyS), [nxS*nyS,3]); 
+    pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nxS*nyS,1]);
+    vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
+    
+    % Add sensor noise to positions
+    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
+    pos_noisy = pos_nxt_SOM + pos_noise*(tk>10);
+        
+    % Get COM states from SOM (Close the loop)
+    [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);
+    x_ini_COM = [phired; dphired];
     
     % Get new Cloth orientation (rotation matrix)
     cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
@@ -397,13 +364,12 @@ for tk=2:nPtRef
     % Real application with 1 robot: get EE pose
     TCPOffset = Rcloth * TCPOffset_local;
     PoseTCP = struct();
-    PoseTCP.position = (u_SOM([1 3 5]) + u_SOM([2 4 6]))'/2 + TCPOffset';
+    PoseTCP.position = (u_SOM([1 3 5]) + u_SOM([2 4 6]))' / 2 + TCPOffset';
     PoseTCP.orientation = rotm2quat(Rtcp);
     
     % Store things
-    store_somstate(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
-    store_nlmstate(:,tk) = [pos_nxt_NLM; vel_nxt_NLM];
-    store_nlmnoisy(:,tk) = x_noisy_nl;
+    store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
+    store_noisy(:,tk) = [pos_noisy; vel_nxt_SOM];
     store_u(:,tk) = u_lin;
     store_pose(tk) = PoseTCP;
     
@@ -419,12 +385,10 @@ fprintf(['-----------------------------------------\n', ...
          ' -- Total time: \t',num2str(tT),' s \n', ...
          ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
 
-time = 0:Ts:size(store_somstate,2)*Ts-Ts;
-
 
 %% KPI
-error_l = store_somstate(coord_lcS([1,3,5]),:)'-Ref_l;
-error_r = store_somstate(coord_lcS([2,4,6]),:)'-Ref_r;
+error_l = store_state(coord_lcS([1,3,5]),:)'-Ref_l;
+error_r = store_state(coord_lcS([2,4,6]),:)'-Ref_r;
 
 eMAE = mean(abs([error_l error_r]));
 eMSE = mean([error_l error_r].^2);
@@ -459,14 +423,17 @@ fprintf(['- Norm RMSE: \t', num2str(1000*eRMSEp),' mm\n']);
 
 
 
-%% PLOT SOM CORNER EVOLUTION
+%% PLOT CORNERS
+time = 0:Ts:nPtRef*Ts-Ts;
+plot_evo = store_state; %store_noisy | store_state 
+
 fig1 = figure(1);
 fig1.Color = [1,1,1];
 fig1.Units = 'normalized';
 fig1.Position = [0.5 0 0.5 0.9];
 
 subplot(15,2,1:2:12);
-plot(time, store_somstate(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
+plot(time, plot_evo(SOM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
 title('\textbf{Left upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -475,7 +442,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,2:2:12);
-plot(time, store_somstate(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
+plot(time, plot_evo(SOM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
 title('\textbf{Right upper corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
@@ -484,7 +451,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,17:2:28);
-plot(time, store_somstate(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
+plot(time, plot_evo(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time, Ref_l, '--k', 'linewidth',1.2);
 hold off
@@ -496,7 +463,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,18:2:28);
-pa1som = plot(time, store_somstate(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
+pa1som = plot(time, plot_evo(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
 hold off
@@ -514,63 +481,6 @@ Lgnd1.Position(1) = 0.5-Lgnd1.Position(3)/2;
 Lgnd1.Position(2) = 0.06;
 
 
-%% PLOT NLM CORNER EVOLUTION
-fig2 = figure(2);
-fig2.Color = [1,1,1];
-fig2.Units = 'normalized';
-fig2.Position = [0 0 0.5 0.9];
-
-plot_nlevo = store_nlmnoisy;
-
-subplot(15,2,1:2:12);
-plot(time, plot_nlevo(NLM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
-title('\textbf{Left upper corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
-
-subplot(15,2,2:2:12);
-plot(time, plot_nlevo(NLM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
-title('\textbf{Right upper corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
-
-subplot(15,2,17:2:28);
-plot(time, plot_nlevo(coord_lcNL([1 3 5]),:)', 'linewidth',1.5);
-hold on
-plot(time, Ref_l, '--k', 'linewidth',1.2);
-hold off
-title('\textbf{Left lower corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
-
-subplot(15,2,18:2:28);
-pa2som = plot(time, plot_nlevo(coord_lcNL([2 4 6]),:)', 'linewidth',1.5);
-hold on
-pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
-hold off
-title('\textbf{Right lower corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
-
-Lgnd2 = legend([pa2som' pa1ref(1)], ...
-               '$x_{NLM}$','$y_{NLM}$', '$z_{NLM}$', 'Ref', ...
-               'Orientation','horizontal', 'Interpreter', 'latex');
-Lgnd2.Position(1) = 0.5-Lgnd2.Position(3)/2;
-Lgnd2.Position(2) = 0.06;
-
-
 %% PLOT SOM IN 3D (W/ CLOTH MOVING)
 fig3 = figure(3);
 fig3.Color = [1,1,1];
@@ -582,33 +492,33 @@ wampov = [-50 30];
 
 SOM_ctrl = SOM.coord_ctrl(1:2);
 SOM_lowc = coord_lcS(1:2);
-store_sompos = store_somstate(1:3*nSOM^2,:);
-All_uSOM = store_somstate(SOM.coord_ctrl,:);
-TCP_pos = reshape([store_pose.position],[3,nPtRef])';
-TCP_q   = reshape([store_pose.orientation],[4,nPtRef])';
+store_pos = plot_evo(1:3*SOMlength,:);
+All_uSOM = plot_evo(SOM.coord_ctrl,:);
+TCP_pos = reshape([store_pose.position],[3,size(Ref_l,1)])';
+TCP_q   = reshape([store_pose.orientation],[4,size(Ref_l,1)])';
 TCP_rot = quat2rotm(TCP_q);
 TCP_Tm  = [TCP_rot permute(TCP_pos',[1,3,2]);
-          [0 0 0 1].*ones(1,1,nPtRef)];
-      
-store_somx = store_sompos(1:nSOM^2,:);
-limx = [floor(min(store_somx(:))*10), ceil(max(store_somx(:))*10)]/10;
-store_somy = store_sompos(nSOM^2+1:2*nSOM^2,:);
-limy = [floor(min(store_somy(:))*10), ceil(max(store_somy(:))*10)]/10;
-store_somz = store_sompos(2*nSOM^2+1:3*nSOM^2,:);
-limz = [floor(min(store_somz(:))*10), ceil(max(max(store_somz(:)), max(TCP_pos(:,3)))*10)]/10;
+          [0 0 0 1].*ones(1,1,size(Ref_l,1))];
+
+store_x = store_pos(1:SOMlength,:);
+limx = [floor(min(store_x(:))*10), ceil(max(store_x(:))*10)]/10;
+store_y = store_pos(SOMlength+1:2*SOMlength,:);
+limy = [floor(min(store_y(:))*10), ceil(max(store_y(:))*10)]/10;
+store_z = store_pos(2*SOMlength+1:3*SOMlength,:);
+limz = [floor(min(store_z(:))*10), ceil(max(max(store_z(:)), max(TCP_pos(:,3)))*10)]/10;
 
 wamws = [-0.4 0.4 -0.8 0.2 -0.4 0.8];
 
 plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)');
 hold on
-plot3(store_somx(SOM_lowc,:)', store_somy(SOM_lowc,:)', store_somz(SOM_lowc,:)');
+plot3(store_x(SOM_lowc,:)', store_y(SOM_lowc,:)', store_z(SOM_lowc,:)');
 
 scatter3(TCP_pos(1,1), TCP_pos(1,2), TCP_pos(1,3), 'om', 'filled');
 plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
 plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
 plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
 
-scatter3(store_somx(:,1), store_somy(:,1), store_somz(:,1), '.b');
+scatter3(store_x(:,1), store_y(:,1), store_z(:,1), '.b');
 hold off
 axis equal; box on; grid on;
 xlim(limx);
@@ -633,12 +543,12 @@ if(plotAnim > 0)
     end
     
     pause(1);
-    for t=2:size(store_somstate,2)
+    for t=2:nPtRef
 
-        scatter3(store_somx(:,t), store_somy(:,t), store_somz(:,t), '.b');
+        scatter3(store_x(:,t), store_y(:,t), store_z(:,t), '.b');
         hold on
-        scatter3(store_somx(SOM_lowc,t), store_somy(SOM_lowc,t), ...
-                 store_somz(SOM_lowc,t), 'ob');
+        scatter3(store_x(SOM_lowc,t), store_y(SOM_lowc,t), ...
+                 store_z(SOM_lowc,t), 'ob');
         scatter3(TCP_pos(t,1), TCP_pos(t,2), TCP_pos(t,3), 'om', 'filled');
                 
         plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
@@ -684,14 +594,14 @@ if(plotAnim > 0)
     
     plot3(All_uSOM(1:2,:)',All_uSOM(3:4,:)',All_uSOM(5:6,:)');
     hold on
-    plot3(store_somx(SOM_lowc,:)', store_somy(SOM_lowc,:)', store_somz(SOM_lowc,:)');
+    plot3(store_x(SOM_lowc,:)', store_y(SOM_lowc,:)', store_z(SOM_lowc,:)');
 
     scatter3(TCP_pos(t,1), TCP_pos(t,2), TCP_pos(t,3), 'om', 'filled');
     plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
     plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
     plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
 
-    scatter3(store_somx(:,t), store_somy(:,t), store_somz(:,t), '.b');
+    scatter3(store_x(:,t), store_y(:,t), store_z(:,t), '.b');
     hold off
     axis equal; box on; grid on;
     xlim(limx);
@@ -710,41 +620,7 @@ if(plotAnim > 0)
 end
 
 
-%% PLOT NLM IN 3D
-fig4 = figure(4);
-fig4.Color = [1,1,1];
-fig4.Units = 'normalized';
-fig4.Position = [0.5 0 0.5 0.90];
 
-NLM_ctrl = NLM.coord_ctrl(1:2);
-NLM_lowc = coord_lcNL(1:2);
-store_nlmpos = plot_nlevo(1:3*nNLM^2,:);
-All_uNLM = plot_nlevo(NLM.coord_ctrl,:);
-
-store_nlmx = store_nlmpos(1:nNLM^2,:);
-store_nlmy = store_nlmpos(nNLM^2+1:2*nNLM^2,:);
-store_nlmz = store_nlmpos(2*nNLM^2+1:3*nNLM^2,:);
-
-plot3(All_uNLM(1:2,:)',All_uNLM(3:4,:)',All_uNLM(5:6,:)');
-hold on
-plot3(store_nlmx(NLM_lowc,:)', store_nlmy(NLM_lowc,:)', store_nlmz(NLM_lowc,:)');
-
-scatter3(TCP_pos(1,1), TCP_pos(1,2), TCP_pos(1,3), 'om', 'filled');
-plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
-plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
-plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
-
-scatter3(store_nlmx(:,1), store_nlmy(:,1), store_nlmz(:,1), '.b');
-hold off
-axis equal; box on; grid on;
-xlim(limx);
-ylim(limy);
-zlim(limz);
-set(gca, 'TickLabelInterpreter','latex');
-xlabel('X', 'Interpreter','latex');
-ylabel('Y', 'Interpreter','latex');
-zlabel('Z', 'Interpreter','latex');
-fig4.Children.View = pov;
 
 
 
