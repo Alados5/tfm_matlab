@@ -292,7 +292,7 @@ for tk=2:nPtRef
     Ref_l_Hp_rot = (Rcloth^-1 * Ref_l_Hp')';
     Ref_r_Hp_rot = (Rcloth^-1 * Ref_r_Hp')';
     
-    % Define reference in the prediction horizon (sliding window)
+    % Define input parameters for the optimizer (sliding window)
     in_params(1,:) = x_ini_COM_rot';
     in_params(2,1:6) = u_rot1';
     in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
