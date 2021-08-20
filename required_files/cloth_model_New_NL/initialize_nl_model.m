@@ -55,9 +55,10 @@ mdl.bnd_aux = struct('Eb',Eb,'I',I,'J',J);
 esquinas = [1, npx, npx*(npy-1)+1, npx*npy]; 
 
 
-%% Controlled nodes
+%% Corner nodes and coordinates
 nodes_ctrl = [npx*(npy-1)+1, npx*npy]; % Two corners
 mdl.coord_ctrl = [nodes_ctrl, nodes_ctrl+mdl.n_nodos, nodes_ctrl+(2*mdl.n_nodos)];
+mdl.coord_lc = [1 npx 1+npx*npy npx*npy+npx 2*npx*npy+1 2*npx*npy+npx];
 
 % Matrix to impose boundary conditions
 mdl.A_b = spalloc(length(mdl.coord_ctrl),3*mdl.n_nodos,length(mdl.coord_ctrl));

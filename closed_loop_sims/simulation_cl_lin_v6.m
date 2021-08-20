@@ -88,11 +88,11 @@ COM.damping = thetaC(4:6);
 COM.z_sum = thetaC(7);
 
 
-% Controlled coordinates (upper corners in x,y,z)
-COM_node_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
-COM.coord_ctrl = [COM_node_ctrl, ...
-                  COM_node_ctrl+nxC*nyC, ...
-                  COM_node_ctrl+2*nxC*nyC];
+% Important Coordinates (upper and lower corners in x,y,z)
+COM_nd_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
+COM.coord_ctrl = [COM_nd_ctrl, COM_nd_ctrl+nxC*nyC, COM_nd_ctrl+2*nxC*nyC];
+C_coord_lc = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
+COM.coord_lc = C_coord_lc;
 
               
 % Define the SOM (LINEAR)
@@ -115,9 +115,11 @@ SOM.damping = thetaS(4:6);
 SOM.z_sum = thetaS(7);
 
 
-% Controlled coordinates (upper corners in x,y,z)
-SOM_node_ctrl = [nxS*(nyS-1)+1, nxS*nyS];
-SOM.coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+nxS*nyS SOM_node_ctrl+2*nxS*nyS];
+% Important Coordinates (upper and lower corners in x,y,z)
+SOM_nd_ctrl = [nxS*(nyS-1)+1, nxS*nyS];
+SOM.coord_ctrl = [SOM_nd_ctrl SOM_nd_ctrl+nxS*nyS SOM_nd_ctrl+2*nxS*nyS];
+S_coord_lc = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
+SOM.coord_lc = S_coord_lc;
 
 % Define initial position of the nodes (needed for ext_force)
 % Second half is velocity (initial v=0)
@@ -148,10 +150,6 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 
 
 %% Start casADi optimization problem
-
-% Lower corner coordinates for both models
-coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
-coord_lcS = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
 
 % Declare model variables
 x = [SX.sym('pos',3*nCOM^2,Hp+1);
@@ -186,7 +184,7 @@ if (opt_Qa == 0)
     Q = 1;
 else
     % Enabled: From the current LCpos to the desired at the horizon
-    lc_dist = Rp(:,end) - x0(coord_lcC);
+    lc_dist = Rp(:,end) - x0(COM.coord_lc);
     lc_dist = abs(lc_dist)/(norm(lc_dist)+eps);
     Q = diag(lc_dist);
 end
@@ -205,7 +203,8 @@ for k = 1:Hp
     
     
     % Objective function
-    objfun = objfun + (x(coord_lcC,k+1)-Rp(:,k+1))'*W_Q*Q*(x(coord_lcC,k+1)-Rp(:,k+1));
+    x_err = x(COM.coord_lc,k+1) - Rp(:,k+1);
+    objfun = objfun + x_err'*W_Q*Q*x_err;
     if (opt_du==0)
         objfun = objfun + u(:,k)'*W_R*u(:,k);
     else
@@ -387,8 +386,8 @@ fprintf(['-----------------------------------------\n', ...
 
 
 %% KPI
-error_l = store_state(coord_lcS([1,3,5]),:)'-Ref_l;
-error_r = store_state(coord_lcS([2,4,6]),:)'-Ref_r;
+error_l = store_state(S_coord_lc([1,3,5]),:)'-Ref_l;
+error_r = store_state(S_coord_lc([2,4,6]),:)'-Ref_r;
 
 eMAE = mean(abs([error_l error_r]));
 eMSE = mean([error_l error_r].^2);
@@ -451,7 +450,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,17:2:28);
-plot(time, plot_evo(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
+plot(time, plot_evo(S_coord_lc([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time, Ref_l, '--k', 'linewidth',1.2);
 hold off
@@ -463,7 +462,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,18:2:28);
-pa1som = plot(time, plot_evo(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
+pa1som = plot(time, plot_evo(S_coord_lc([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
 hold off
@@ -491,7 +490,7 @@ pov = [-30 20];
 wampov = [-50 30];
 
 SOM_ctrl = SOM.coord_ctrl(1:2);
-SOM_lowc = coord_lcS(1:2);
+SOM_lowc = S_coord_lc(1:2);
 store_pos = plot_evo(1:3*SOMlength,:);
 All_uSOM = plot_evo(SOM.coord_ctrl,:);
 TCP_pos = reshape([store_pose.position],[3,size(Ref_l,1)])';

@@ -98,17 +98,19 @@ else
 end
 
 
-% Controlled coordinates (upper corners in x,y,z)
-COM_node_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
-COM.coord_ctrl = [COM_node_ctrl, ...
-                  COM_node_ctrl+nxC*nyC, ...
-                  COM_node_ctrl+2*nxC*nyC];
+% Important Coordinates (upper and lower corners in x,y,z)
+COM_nd_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
+COM.coord_ctrl = [COM_nd_ctrl, COM_nd_ctrl+nxC*nyC, COM_nd_ctrl+2*nxC*nyC];
+C_coord_lc = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
+COM.coord_lc = C_coord_lc;
+
 
 % Define the SOM (NONLINEAR)
 nxS = nSOM;
 nyS = nSOM;
 SOMlength = nxS*nyS;
 [SOM, pos] = initialize_nl_model(lCloth,nSOM,cCloth,aCloth,Ts);
+S_coord_lc = SOM.coord_lc;
 
 
 % Define initial position of the nodes (needed for ext_force)
@@ -135,10 +137,6 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 
 
 %% Start casADi optimization problem
-
-% Lower corner coordinates for both models
-coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
-coord_lcS = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
 
 % Declare model variables
 x = [SX.sym('pos',3*nCOM^2,Hp+1);
@@ -173,7 +171,7 @@ if (opt_Qa == 0)
     Q = 1;
 else
     % Enabled: From the current LCpos to the desired at the horizon
-    lc_dist = Rp(:,end) - x0(coord_lcC);
+    lc_dist = Rp(:,end) - x0(COM.coord_lc);
     lc_dist = abs(lc_dist)/(norm(lc_dist)+eps);
     Q = diag(lc_dist);
 end
@@ -192,7 +190,8 @@ for k = 1:Hp
     
 
     % Objective function
-    objfun = objfun + (x(coord_lcC,k+1)-Rp(:,k+1))'*W_Q*Q*(x(coord_lcC,k+1)-Rp(:,k+1));
+    x_err = x(COM.coord_lc,k+1) - Rp(:,k+1);
+    objfun = objfun + x_err'*W_Q*Q*x_err;
     if (opt_du==0)
         objfun = objfun + u(:,k)'*W_R*u(:,k);
     else
@@ -445,8 +444,8 @@ fprintf([' -- Model Reward:\t', num2str(Rwd), '\n']);
 
 
 %% KPI
-error_l = store_state(coord_lcS([1,3,5]),:)'-Ref_l(1:end,1:3);
-error_r = store_state(coord_lcS([2,4,6]),:)'-Ref_r(1:end,1:3);
+error_l = store_state(S_coord_lc([1,3,5]),:)'-Ref_l(1:end,1:3);
+error_r = store_state(S_coord_lc([2,4,6]),:)'-Ref_r(1:end,1:3);
 
 eMAE = mean(abs([error_l error_r]));
 eMSE = mean([error_l error_r].^2);
@@ -507,7 +506,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,17:2:28);
-plot(time,store_state(coord_lcS([1 3 5]),:)', 'linewidth',1.5);
+plot(time,store_state(S_coord_lc([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time,Ref_l, '--k', 'linewidth',1.2);
 hold off
@@ -519,7 +518,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(15,2,18:2:28);
-pa1som = plot(time,store_state(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
+pa1som = plot(time,store_state(S_coord_lc([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time,Ref_r, '--k', 'linewidth',1.2);
 hold off
@@ -548,7 +547,7 @@ wampov = [-50 30];
 
 SOMlength = nxS*nyS;
 SOM_ctrl = SOM.coord_ctrl(1:2);
-SOM_lowc = coord_lcS(1:2);
+SOM_lowc = S_coord_lc(1:2);
 store_pos = store_state(1:3*SOMlength,:);
 TCP_pos = reshape([store_pose.position],[3,nPtRef])';
 TCP_q   = reshape([store_pose.orientation],[4,nPtRef])';
@@ -685,9 +684,9 @@ fig4.Units = 'normalized';
 fig4.Position = [0.5 0.5 0.5 0.4];
 
 subplot(7,2,1:2:12);
-plot(time,store_state(coord_lcS([1 3 5]),:)', 'linewidth',1.5)
+plot(time,store_state(S_coord_lc([1 3 5]),:)', 'linewidth',1.5)
 hold on
-plot(time,All_StC(coord_lcC([1 3 5]),:)','--', 'linewidth',1.5);
+plot(time,All_StC(C_coord_lc([1 3 5]),:)','--', 'linewidth',1.5);
 hold off
 title('\textbf{Left lower corner}', 'Interpreter', 'latex')
 grid on
@@ -697,9 +696,9 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(7,2,2:2:12);
-pa4som = plot(time,store_state(coord_lcS([2 4 6]),:)', 'linewidth',1.5);
+pa4som = plot(time,store_state(S_coord_lc([2 4 6]),:)', 'linewidth',1.5);
 hold on
-pa4com = plot(time,All_StC(coord_lcC([2 4 6]),:)','--', 'linewidth',1.5);
+pa4com = plot(time,All_StC(C_coord_lc([2 4 6]),:)','--', 'linewidth',1.5);
 hold off
 title('\textbf{Right lower corner}', 'Interpreter', 'latex')
 grid on
