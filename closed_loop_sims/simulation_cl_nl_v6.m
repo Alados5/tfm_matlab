@@ -65,6 +65,20 @@ lCloth = norm(dphi_corners1); %0.3
 cCloth = (Ref_r(1,:) + Ref_l(1,:))/2 + [0 0 lCloth/2];
 aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
+
+% Load parameter table and select corresponding row(s)
+ThetaLUT = readtable('../learn_model/LearntModelParams.csv');
+LUT_COM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nCOM);
+LUT_Exp = ThetaLUT(LUT_COM_id, :);
+if (size(LUT_Exp,1) > 1)
+    error("There are multiple rows with same experiment parameters.");
+elseif (size(LUT_Exp,1) < 1)
+    error("There are no saved experiments with those parameters.");
+else
+    theta = table2array(LUT_Exp(:, contains(LUT_Exp.Properties.VariableNames, 'Th_')));
+end
+
+
 % Define COM parameters
 nxC = nCOM;
 nyC = nCOM;
@@ -75,28 +89,9 @@ COM.col = nyC;
 COM.mass = 0.1;
 COM.grav = 9.8;
 COM.dt = Ts;
-
-
-% Load parameter table and select corresponding row
-ThetaLUT = readtable('../learn_model/ThetaModelLUT.csv');
-
-% Get the corresponding row
-LUT_Exp_id = (ThetaLUT.ExpSetN == ExpSetN) & (ThetaLUT.NExp == NExp) & ...
-             (ThetaLUT.NTrial == NTrial) & (ThetaLUT.Ts == Ts) & ...
-             (ThetaLUT.nCOM == nCOM);
-LUT_Exp = ThetaLUT(LUT_Exp_id, :);
-
-if (size(LUT_Exp,1) > 1)
-    error("There are multiple rows with same experiment parameters.");
-elseif (size(LUT_Exp,1) < 1)
-    error("There are no saved experiments with those parameters.");
-else
-    theta = table2array(LUT_Exp(:, contains(LUT_Exp.Properties.VariableNames, 'Th_')));
-    COM.stiffness = theta(1:3);
-    COM.damping = theta(4:6);
-    COM.z_sum = theta(7) + zsum0;
-end
-
+COM.stiffness = theta(1:3);
+COM.damping = theta(4:6);
+COM.z_sum = theta(7) + zsum0;
 
 % Important Coordinates (upper and lower corners in x,y,z)
 COM_nd_ctrl = [nxC*(nyC-1)+1, nxC*nyC];

@@ -1,8 +1,8 @@
 close all; clc; clear;
 
 %% Initialization
-ExpSetN = 2;
-SimType = 'RTM'; %LIN, NL, RTM
+ExpSetN = 3;
+SimType = 'LIN'; %LIN, NL, RTM
 ExpSetNote = '';
 NTraj = 6;
 Ts = 0.020;
@@ -14,16 +14,13 @@ nNLM = 10;
 sigmaD = 0.0;
 sigmaN = 0.0;
 
-ubound = 50*1e-3;
-gbound = 0; % (Eq. Constraint)
-opt_du = 1;
-opt_Qa = 0;
+ubound  = 50*1e-3;
+gbound  = 0; % (Eq. Constraint)
+opt_du  = 1;
+opt_Qa  = 0;
 opt_Rwd = 1; % 1=RMSE, 2=Tov, 3=RMSE+Tov
 
-SOM_ThetaExp = [4,8,2];
-COM_ThetaExp = [4,8,2];
-
-e0 = 20;
+e0 = 0;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
@@ -39,15 +36,9 @@ ThW = 1:2;
 
 
 % Load parameter table and select corresponding row
-ThetaModelLUT = readtable('./ThetaModelLUT.csv');
-LUT_SOM_id = (ThetaModelLUT.ExpSetN == SOM_ThetaExp(1)) & ...
-             (ThetaModelLUT.NExp == SOM_ThetaExp(2)) & ...
-             (ThetaModelLUT.NTrial == SOM_ThetaExp(3)) & ... 
-             (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.nCOM == nSOM);
-LUT_COM_id = (ThetaModelLUT.ExpSetN == COM_ThetaExp(1)) & ...
-             (ThetaModelLUT.NExp == COM_ThetaExp(2)) & ...
-             (ThetaModelLUT.NTrial == COM_ThetaExp(3)) & ...
-             (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.nCOM == nCOM);
+ThetaModelLUT = readtable('../learn_model/LearntModelParams.csv');
+LUT_SOM_id = (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.MdlSz == nSOM);
+LUT_COM_id = (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.MdlSz == nCOM);
 LUT_SOM = ThetaModelLUT(LUT_COM_id, :);
 LUT_COM = ThetaModelLUT(LUT_COM_id, :);
 if (size(LUT_COM,1) > 1 || size(LUT_SOM,1) > 1)
@@ -102,7 +93,7 @@ dirname = ['Exps',num2str(ExpSetN), ExpSetNote, ...
 
 if e0==0
     % Initial seed [WQ; WR]
-    mw0 = [0; 1];            %[0.5; 0.5]; [0; 1]; [1; 0];
+    mw0 = [0.5; 0.5];        %[0.5; 0.5]; [0.0; 1.0]; [1.0; 0.0];
     Sw0 = diag([0.5; 0.5]);  %[0.01; 0.05]
 else
     prevrange = [num2str(e0-NEpochs),'-',num2str(e0)];

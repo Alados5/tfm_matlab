@@ -49,6 +49,23 @@ lCloth = norm(dphi_corners1);
 cCloth = (Ref_r(1,:) + Ref_l(1,:))/2 + [0 0 lCloth/2];
 aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
+
+% Load parameter table and select corresponding row(s)
+ThetaLUT = readtable('../learn_model/LearntModelParams.csv');
+LUT_SOM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nSOM);
+LUT_COM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nCOM);
+LUT_COM = ThetaLUT(LUT_COM_id, :);
+LUT_SOM = ThetaLUT(LUT_COM_id, :);
+if (size(LUT_COM,1) > 1 || size(LUT_SOM,1) > 1)
+    error("There are multiple rows with same experiment parameters.");
+elseif (size(LUT_COM,1) < 1 || size(LUT_SOM,1) < 1)
+    error("There are no saved experiments with those parameters.");
+else
+    thetaC = table2array(LUT_COM(:, contains(LUT_COM.Properties.VariableNames, 'Th_')));
+    thetaS = table2array(LUT_SOM(:, contains(LUT_SOM.Properties.VariableNames, 'Th_')));
+end
+
+
 % Define COM parameters
 nxC = nCOM;
 nyC = nCOM;
@@ -59,34 +76,9 @@ COM.col = nyC;
 COM.mass = 0.1;
 COM.grav = 9.8;
 COM.dt = Ts;
-
-
-% Load parameter table and select corresponding row
-ThetaLUT = readtable('../learn_model/ThetaModelLUT.csv');
-
-% Get the corresponding row(s)
-LUT_COM_id = (ThetaLUT.ExpSetN == ExpSetN) & (ThetaLUT.NExp == NExp) & ...
-             (ThetaLUT.NTrial == NTrial) & (ThetaLUT.Ts == Ts) & ...
-             (ThetaLUT.nCOM == nCOM);
-LUT_SOM_id = (ThetaLUT.NExp == NExp) & (ThetaLUT.NTrial == NTrial) & ... 
-             (ThetaLUT.Ts == Ts) & (ThetaLUT.nCOM == nSOM);
-LUT_COM = ThetaLUT(LUT_COM_id, :);
-LUT_SOM = ThetaLUT(LUT_COM_id, :);
-
-if (size(LUT_COM,1) > 1 || size(LUT_SOM,1) > 1)
-    error("There are multiple rows with same experiment parameters.");
-elseif (size(LUT_COM,1) < 1 || size(LUT_SOM,1) < 1)
-    error("There are no saved experiments with those parameters.");
-else
-    thetaC = table2array(LUT_COM(:, contains(LUT_COM.Properties.VariableNames, 'Th_')));
-    thetaS = table2array(LUT_SOM(:, contains(LUT_SOM.Properties.VariableNames, 'Th_')));
-end
-
-% Apply COM parameters
 COM.stiffness = thetaC(1:3);
 COM.damping = thetaC(4:6);
 COM.z_sum = thetaC(7);
-
 
 % Important Coordinates (upper and lower corners in x,y,z)
 COM_nd_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
@@ -105,21 +97,18 @@ SOM.col = nyS;
 SOM.mass = 0.1;
 SOM.grav = 9.8;
 SOM.dt = Ts;
-
-% Real initial position in space
-pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
-
-% Apply SOM parameters
 SOM.stiffness = thetaS(1:3);
 SOM.damping = thetaS(4:6);
 SOM.z_sum = thetaS(7);
-
 
 % Important Coordinates (upper and lower corners in x,y,z)
 SOM_nd_ctrl = [nxS*(nyS-1)+1, nxS*nyS];
 SOM.coord_ctrl = [SOM_nd_ctrl SOM_nd_ctrl+nxS*nyS SOM_nd_ctrl+2*nxS*nyS];
 S_coord_lc = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
 SOM.coord_lc = S_coord_lc;
+
+% Real initial position in space
+pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
 
 % Define initial position of the nodes (needed for ext_force)
 % Second half is velocity (initial v=0)
