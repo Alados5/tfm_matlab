@@ -38,8 +38,8 @@ end
 % -------------------
 
 % Extract input parameters
-W_Q = theta(1);
-W_R = theta(2);
+W_Q = theta.Q;
+W_R = theta.R;
 
 
 % Load trajectory to follow
@@ -62,8 +62,6 @@ COM.col = nyC;
 COM.mass = 0.1;
 COM.grav = 9.8;
 COM.dt = Ts;
-
-% Apply COM parameters
 COM.stiffness = paramsCOM(1:3);
 COM.damping = paramsCOM(4:6);
 COM.z_sum = paramsCOM(7);
@@ -284,14 +282,14 @@ for tk=2:nPtRef
     
     % Add disturbance to SOM positions
     x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
-    x_distd = store_state(:,tk-1) + x_dist*(tk>20);
+    x_distd = store_state(:,tk-1) + x_dist*(tk>10);
     
     % Simulate a step of the SOM
     [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_distd,u_SOM,SOM); 
     
     % Add sensor noise to positions
     pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
-    pos_noisy = pos_nxt_SOM + pos_noise*(tk>20);
+    pos_noisy = pos_nxt_SOM + pos_noise*(tk>10);
     
     % Get COM states from SOM (Close the loop)
     [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);

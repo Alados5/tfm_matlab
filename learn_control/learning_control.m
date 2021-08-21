@@ -3,10 +3,10 @@ close all; clc; clear;
 %% Initialization
 ExpSetN = 3;
 SimType = 'LIN'; %LIN, NL, RTM
-ExpSetNote = '';
+ExpNote = '_Det_W1_RwdE_Qk_Du';
 NTraj = 6;
-Ts = 0.025;
-Hp = 20;
+Ts = 0.015;
+Hp = 30;
 Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
@@ -14,13 +14,15 @@ nNLM = 10;
 sigmaD = 0.0;
 sigmaN = 0.0;
 
-ubound  = 50*1e-3;
-gbound  = 0; % (Eq. Constraint)
-opt_du  = 1;
-opt_Qa  = 0;
-opt_Rwd = 1; % 1=RMSE, 2=Tov, 3=RMSE+Tov
+ubound  = 50*1e-3;  % (Enough Displ.)
+gbound  = 0;        % (Eq. Constraint)
 
-e0 = 0;
+opt_du  = 1;  % 0=u,      1=Du
+opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
+opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
+opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
+
+e0 = 5;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
@@ -28,11 +30,6 @@ UseLambda = 1;
 
 Plot3DTraj = 0;
 Plot2DTraj = 1;
-
-% Parameters to learn and defaults:
-%  [W_Q=0.1, W_R=1]
-ThMask = [1 1]';
-ThW = 1:2;
 
 
 % Load parameter table and select corresponding row
@@ -72,6 +69,7 @@ opts.paramsCOM = paramsCOM;
 % -------------------------
 
 
+% Simulation type categorization
 if strcmp(SimType, 'LIN')
     SimTypeN = 0;
     wvname = '';
@@ -85,17 +83,49 @@ else
     error(['Simulation type "',SimType,'" is not a valid option.']);
 end
 
-dirname = ['Exps',num2str(ExpSetN), ExpSetNote, ...
-           '/',num2str(SimTypeN), '_', SimType, ...
-           '/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
-           '_hp',num2str(Hp), wvname, '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
+% Weight structure categorization
+if opt_Wgh==3
+    %[qx; qy; qz; k]
+    ThW = 1:3;
+    ThM6 = @(mwi) [mwi(1) mwi(1) mwi(2) mwi(2) mwi(3) mwi(3);
+                   mwi([1,1,2,2,3,3])'.*10^mwi(4)];
+elseif opt_Wgh==2
+    %[qx; qy; qz; r]
+    ThW = 1:4;
+    ThM6 = @(mwi) [mwi(1) mwi(1) mwi(2) mwi(2) mwi(3) mwi(3);
+                   mwi(4) mwi(4) mwi(4) mwi(4) mwi(4) mwi(4)];
+else
+    %[q; r]
+    ThW = 1:2;
+    ThM6 = @(mwi) [mwi(1) mwi(1) mwi(1) mwi(1) mwi(1) mwi(1);
+                   mwi(2) mwi(2) mwi(2) mwi(2) mwi(2) mwi(2)];
+end
+
+% Directory name
+dirname = ['Exps',num2str(ExpSetN), '/',num2str(SimTypeN), ...
+           '_', SimType, ExpNote, ...
+           '/traj',num2str(NTraj), '_ts',num2str(Ts*1000), ...
+           '_hp',num2str(Hp), wvname, ...
+           '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
 
 
 if e0==0
-    % Initial seed [WQ; WR]
-    mw0 = [0.5; 0.5];        %[0.5; 0.5]; [0.0; 1.0]; [1.0; 0.0];
-    Sw0 = diag([0.5; 0.5]);  %[0.01; 0.05]
+    % Initial seed
+    if opt_Wgh==3
+        %[qx; qy; qz; k]
+        mw0 = [0.5; 0.5; 0.5; 0];
+        Sw0 = diag([0.5; 0.5; 0.5; 1]);
+    elseif opt_Wgh==2
+        %[qx; qy; qz; r]
+        mw0 = [0.5; 0.5; 0.5; 0.5];
+        Sw0 = diag([0.5; 0.5; 0.5; 0.5]);
+    else
+        %[q; r]
+        mw0 = [0.5; 0.5];        %[0.5; 0.5]; [0.0; 1.0]; [1.0; 0.0];
+        Sw0 = diag([0.5; 0.5]);  %[0.01; 0.05]
+    end
 else
+    % Continue experiment
     prevrange = [num2str(e0-NEpochs),'-',num2str(e0)];
 
     MWans = load([dirname,'/MW_',prevrange,'.mat']);
@@ -145,14 +175,17 @@ while epoch <= NEpochs
         thetai = mvnrnd(mw, SwL)';
         th_maxW = max(thetai(ThW));
         thetai(ThW) = thetai(ThW)/th_maxW;
-        while any(thetai<0) || any(thetai(ThW)>1) || all(thetai(ThW)==0)
+        while any(thetai(ThW)<0) || any(thetai(ThW)>1) || all(thetai(ThW)==0)
             thetai = mvnrnd(mw, SwL)';
             th_maxW = max(thetai(ThW));
             thetai(ThW) = thetai(ThW)/th_maxW;
         end
-
-        theta = thetai.*ThMask;
-        fprintf([' Theta: [',num2str(theta',5),']\n']);
+        
+        theta6 = ThM6(thetai);
+        theta = struct;
+        theta.Q = diag(theta6(1,:));
+        theta.R = diag(theta6(2,:));
+        fprintf([' Theta: [',num2str(thetai',5),']\n']);
         
         if SimTypeN==2
             [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts);
@@ -226,7 +259,12 @@ fprintf(['\nExecuting resulting means per epoch...\n', ...
 
 for epoch=1:size(MW2D,2)
     fprintf(['\nEpoch: ', num2str(e0+epoch-1), '\n']);
-    theta = (MW2D(:,epoch).*ThMask)';
+    
+    theta6 = ThM6(MW2D(:,epoch));
+    theta = struct;
+    theta.Q = diag(theta6(1,:));
+    theta.R = diag(theta6(2,:));
+
     if SimTypeN==2
         [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts);
     elseif SimTypeN==1
@@ -236,7 +274,7 @@ for epoch=1:size(MW2D,2)
     end
     RWMW(epoch) = Rwd;
 end
-ThLearnt = (MW2D(:,end).*ThMask)';
+ThLearnt = MW2D(:,end)';
 fprintf(['\nLearnt Theta: [',num2str(ThLearnt,5),']\n']);
 
 % Save data

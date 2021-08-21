@@ -44,8 +44,8 @@ end
 % -------------------
 
 % Extract input parameters
-W_Q = theta(1);
-W_R = theta(2);
+W_Q = theta.Q;
+W_R = theta.R;
 
 
 % Load trajectory to follow
@@ -59,6 +59,7 @@ lCloth = norm(dphi_corners1);
 cCloth = (Ref_r(1,:) + Ref_l(1,:))/2 + [0 0 lCloth/2];
 aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
+
 % Define COM parameters
 COM = struct;
 COM.row = nCOM;
@@ -66,8 +67,6 @@ COM.col = nCOM;
 COM.mass = 0.1;
 COM.grav = 9.8;
 COM.dt = Ts;
-
-% Apply COM parameters
 COM.stiffness = paramsCOM(1:3);
 COM.damping = paramsCOM(4:6);
 COM.z_sum = paramsCOM(7);
@@ -86,11 +85,6 @@ SOM.col = nSOM;
 SOM.mass = 0.1;
 SOM.grav = 9.8;
 SOM.dt = Ts;
-
-% Real initial position in space
-pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
-
-% Apply SOM parameters
 SOM.stiffness = paramsSOM(1:3);
 SOM.damping = paramsSOM(4:6);
 SOM.z_sum = paramsSOM(7);
@@ -101,10 +95,13 @@ SOM.coord_ctrl = [SOM_node_ctrl SOM_node_ctrl+nSOM^2 SOM_node_ctrl+2*nSOM^2];
 S_coord_lc = [1 nSOM 1+nSOM^2 nSOM^2+nSOM 2*nSOM^2+1 2*nSOM^2+nSOM];
 SOM.coord_lc = S_coord_lc;
 
+% Real initial position in space
+pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
+
+
 % Define initial position of the nodes (needed for ext_force)
 % Second half is velocity (initial v=0)
 x_ini_SOM = [reshape(pos,[3*nSOM^2 1]); zeros(3*nSOM^2,1)];
-
 
 % Reduce initial SOM position to COM size if necessary
 [pos_rd,~] = take_reduced_mesh(x_ini_SOM(1:3*nSOM^2),x_ini_SOM(3*nSOM^2+1:6*nSOM^2), nSOM, nCOM);
@@ -256,7 +253,7 @@ for tk=2:nPtRef
     
     % Get new feedback value (eq. to "Spin once")
     x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>20);
+    x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>10);
     
     [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
                                       x_noisy_nl(3*nNLM^2+1:6*nNLM^2), ...
@@ -333,7 +330,7 @@ for tk=2:nPtRef
     
     % Add disturbance to NLM positions
     x_dist = [normrnd(0,sigmaD^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_distd = store_nlmstate(:,tk-1) + x_dist*(tk>20);
+    x_distd = store_nlmstate(:,tk-1) + x_dist*(tk>10);
     
     % Simulate a NLM step
     [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_distd,u_SOM,NLM); 

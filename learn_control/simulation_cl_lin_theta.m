@@ -39,8 +39,8 @@ end
 % -------------------
 
 % Extract input parameters
-W_Q = theta(1);
-W_R = theta(2);
+W_Q = theta.Q;
+W_R = theta.R;
 
 
 % Load trajectory to follow
@@ -63,8 +63,6 @@ COM.col = nyC;
 COM.mass = 0.1;
 COM.grav = 9.8;
 COM.dt = Ts;
-
-% Apply COM parameters
 COM.stiffness = paramsCOM(1:3);
 COM.damping = paramsCOM(4:6);
 COM.z_sum = paramsCOM(7);
@@ -85,11 +83,6 @@ SOM.col = nyS;
 SOM.mass = 0.1;
 SOM.grav = 9.8;
 SOM.dt = Ts;
-
-% Real initial position in space
-pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
-
-% Apply SOM parameters
 SOM.stiffness = paramsSOM(1:3);
 SOM.damping = paramsSOM(4:6);
 SOM.z_sum = paramsSOM(7);
@@ -100,10 +93,13 @@ SOM.coord_ctrl = [SOM_nd_ctrl SOM_nd_ctrl+nxS*nyS SOM_nd_ctrl+2*nxS*nyS];
 S_coord_lc = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
 SOM.coord_lc = S_coord_lc;
 
+% Real initial position in space
+pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
+
+
 % Define initial position of the nodes (needed for ext_force)
 % Second half is velocity (initial v=0)
 x_ini_SOM = [reshape(pos,[3*nxS*nyS 1]); zeros(3*nxS*nyS,1)];
-
 
 % Reduce initial SOM position to COM size if necessary
 [reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
@@ -283,7 +279,7 @@ for tk=2:nPtRef
     
     % Add disturbance to SOM positions
     x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
-    x_distd = store_state(:,tk-1) + x_dist*(tk>20);
+    x_distd = store_state(:,tk-1) + x_dist*(tk>10);
     
     % Linear SOM uses local variables too (rot)
     pos_ini_SOM = reshape(x_distd(1:3*nxS*nyS), [nxS*nyS,3]);
@@ -304,7 +300,7 @@ for tk=2:nPtRef
     
     % Add sensor noise to positions
     pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
-    pos_noisy = pos_nxt_SOM + pos_noise*(tk>20);
+    pos_noisy = pos_nxt_SOM + pos_noise*(tk>10);
         
     % Get COM states from SOM (Close the loop)
     [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);
