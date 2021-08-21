@@ -260,16 +260,18 @@ Rtcp = [cloth_y cloth_x -cloth_z];
 % TCP initial position
 tcp_ini = (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2 + (Rcloth*TCPOffset_local)';
 
-% Simulate some SOM steps to stabilize the NL model
+% Simulate some NLM steps to stabilize the NL model
+warning('off','MATLAB:nearlySingularMatrix');
 lastwarn('','');
 [p_ini_NLM, ~] = simulate_cloth_step(x_ini_NLM,u_SOM,NLM);
 [~, warnID] = lastwarn;
 while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
     lastwarn('','');
+    x_ini_NLM = [p_ini_NLM; zeros(3*nNLM^2,1)];
     [p_ini_NLM, ~] = simulate_cloth_step(x_ini_NLM,u_SOM,NLM);
     [~, warnID] = lastwarn;
-    x_ini_NLM = [p_ini_NLM; zeros(3*nNLM^2,1)];
 end
+warning('on','MATLAB:nearlySingularMatrix');
 
 % Initialize storage
 in_params = zeros(2+6, max(n_states, Hp+1));

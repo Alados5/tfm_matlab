@@ -17,7 +17,7 @@ animwWAM = 0;
 
 % General Parameters
 NTraj = 6;
-Ts = 0.010;
+Ts = 0.020;
 Hp = 25;
 nSOM = 4;
 nCOM = 4;
@@ -30,7 +30,7 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 ubound = 50*1e-3; %5*1e-3
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.10;
+W_Q = 0.01;
 W_R = 1.00;
 opt_du = 1;
 opt_Qa = 0;
@@ -245,15 +245,17 @@ Rtcp = [cloth_y cloth_x -cloth_z];
 tcp_ini = (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2 + (Rcloth*TCPOffset_local)';
 
 % Simulate some SOM steps to stabilize the NL model
+warning('off','MATLAB:nearlySingularMatrix');
 lastwarn('','');
 [p_ini_SOM, ~] = simulate_cloth_step(x_ini_SOM,u_SOM,SOM);
 [~, warnID] = lastwarn;
 while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
     lastwarn('','');
+    x_ini_SOM = [p_ini_SOM; zeros(3*nxS*nyS,1)];
     [p_ini_SOM, ~] = simulate_cloth_step(x_ini_SOM,u_SOM,SOM);
     [~, warnID] = lastwarn;
-    x_ini_SOM = [p_ini_SOM; zeros(3*nxS*nyS,1)];
 end
+warning('on','MATLAB:nearlySingularMatrix');
 
 % Initialize storage
 in_params = zeros(2+6, max(n_states, Hp+1));
