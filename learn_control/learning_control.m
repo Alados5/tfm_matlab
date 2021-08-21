@@ -1,24 +1,30 @@
 close all; clc; clear;
 
 %% Initialization
-ExpSetN = 1;
-SimType = 'LIN'; %LIN, NL, RTM
+ExpSetN = 2;
+SimType = 'RTM'; %LIN, NL, RTM
 ExpSetNote = '';
-NTraj = 13;
+NTraj = 6;
 Ts = 0.020;
 Hp = 25;
 Wv = 0.3;
-sigmaD = 0.0;
-sigmaN = 0.0;
 nSOM = 4;
 nCOM = 4;
 nNLM = 10;
+sigmaD = 0.0;
+sigmaN = 0.0;
+
+ubound = 50*1e-3;
+gbound = 0; % (Eq. Constraint)
+opt_du = 1;
+opt_Qa = 0;
+opt_Rwd = 1; % 1=RMSE, 2=Tov, 3=RMSE+Tov
 
 SOM_ThetaExp = [4,8,2];
 COM_ThetaExp = [4,8,2];
 
 e0 = 20;
-minRwd = -100;
+minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
 UseLambda = 1;
@@ -27,9 +33,9 @@ Plot3DTraj = 0;
 Plot2DTraj = 1;
 
 % Parameters to learn and defaults:
-%  [ubound=5*1e-3, gbound=0*1e-3, W_Q=1, W_T=1, W_R=10]
-ThMask = [0.001 0.001 1 1 1]';
-ThW = 3:5;
+%  [W_Q=0.1, W_R=1]
+ThMask = [1 1]';
+ThW = 1:2;
 
 
 % Load parameter table and select corresponding row
@@ -60,15 +66,19 @@ opts.NTraj = NTraj;
 opts.Ts = Ts;
 opts.Hp = Hp;
 opts.Wv = Wv;
-opts.sigmaD = sigmaD;
-opts.sigmaN = sigmaN;
 opts.nSOM = nSOM;
 opts.nCOM = nCOM;
 opts.nNLM = nNLM;
+opts.sigmaD = sigmaD;
+opts.sigmaN = sigmaN;
+opts.ubound = ubound;
+opts.gbound = gbound;
+opts.opt_du = opt_du;
+opts.opt_Qa = opt_Qa;
+opts.opt_Rwd = opt_Rwd;
 opts.paramsSOM = paramsSOM;
 opts.paramsCOM = paramsCOM;
-opts.xbound = 1.5;
-% ----------
+% -------------------------
 
 
 if strcmp(SimType, 'LIN')
@@ -84,15 +94,16 @@ else
     error(['Simulation type "',SimType,'" is not a valid option.']);
 end
 
-dirname = ['Exps',num2str(ExpSetN), '_',SimType, ExpSetNote, ...
+dirname = ['Exps',num2str(ExpSetN), ExpSetNote, ...
+           '/',num2str(SimTypeN), '_', SimType, ...
            '/traj',num2str(NTraj),'_ts',num2str(Ts*1000), ...
            '_hp',num2str(Hp), wvname, '_ns',num2str(nSOM), '_nc',num2str(nCOM)];
 
 
 if e0==0
-    % Initial seed [xbound; ubound; gbound; WQ; WT; WR]
-    mw0 = [5; 0;          0.5; 0.5; 0.5];
-    Sw0 = diag([2; 0.1;   0.5; 0.5; 0.5]);
+    % Initial seed [WQ; WR]
+    mw0 = [0; 1];            %[0.5; 0.5]; [0; 1]; [1; 0];
+    Sw0 = diag([0.5; 0.5]);  %[0.01; 0.05]
 else
     prevrange = [num2str(e0-NEpochs),'-',num2str(e0)];
 
@@ -139,7 +150,6 @@ while epoch <= NEpochs
         
         lambda = mean(svd(Sw))/5;
         SwL = Sw + UseLambda*eye(NParams)*lambda;
-        %SwL(7,7) = Sw(7,7)*1.1;
         
         thetai = mvnrnd(mw, SwL)';
         th_maxW = max(thetai(ThW));
@@ -401,11 +411,8 @@ elseif (size(LUT_Exp,1) == 1)
     % Update experiment row
     LUT_row = find(LUT_Exp_id);
     ThetaCtrlLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
-    ThetaCtrlLUT(LUT_row,'Th_ubound') = {ThLearnt(1)};
-    ThetaCtrlLUT(LUT_row,'Th_gbound') = {ThLearnt(2)};
-    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(3)};
-    ThetaCtrlLUT(LUT_row,'Th_WT') = {ThLearnt(4)};
-    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(5)};
+    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(1)};
+    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(2)};
 else
     % Add experiment row
     LUT_row = size(ThetaCtrlLUT,1)+1;
@@ -421,11 +428,8 @@ else
     ThetaCtrlLUT(LUT_row,'NSamples') = {NSamples};
     ThetaCtrlLUT(LUT_row,'MinRwd') = {minRwd};
     
-    ThetaCtrlLUT(LUT_row,'Th_ubound') = {ThLearnt(1)};
-    ThetaCtrlLUT(LUT_row,'Th_gbound') = {ThLearnt(2)};
-    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(3)};
-    ThetaCtrlLUT(LUT_row,'Th_WT') = {ThLearnt(4)};
-    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(5)};
+    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(1)};
+    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(2)};
 end
 writetable(ThetaCtrlLUT,'ThetaControlLUT.csv');
 fprintf('Updated ThetaControlLUT.csv\n');

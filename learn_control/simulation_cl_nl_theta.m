@@ -15,26 +15,31 @@ if nargin < 2
     nCOM = 4;
     nSOM = 4;
     paramsCOM = [-300 -10 -225  -4 -2.5 -4 0.03];
-    xbound = 1.5;
+    ubound = 50e-3;
+    gbound = 0;
+    opt_du = 1;
+    opt_Qa = 0;
+    RwdType = 1; % 1=RMSE, 2=Tov, 3=RMSE+Tov
 else
-    NTraj = opts.NTraj;
-    Ts = opts.Ts;
-    Hp = opts.Hp;
-    sigmaD = opts.sigmaD;
-    sigmaN = opts.sigmaN;
-    nCOM = opts.nCOM;
-    nSOM = opts.nSOM;
+    NTraj     = opts.NTraj;
+    Ts        = opts.Ts;
+    Hp        = opts.Hp;
+    sigmaD    = opts.sigmaD;
+    sigmaN    = opts.sigmaN;
+    nCOM      = opts.nCOM;
+    nSOM      = opts.nSOM;
     paramsCOM = opts.paramsCOM;  
-    xbound = opts.xbound;
+    ubound    = opts.ubound;
+    gbound    = opts.gbound;
+    opt_du    = opts.opt_du;
+    opt_Qa    = opts.opt_Qa;
+    RwdType   = opts.opt_Rwd;
 end
 % -------------------
 
 % Extract input parameters
-ubound = theta(1);
-gbound = theta(2);
-W_Q = theta(3);
-W_T = theta(4);
-W_R = theta(5);
+W_Q = theta(1);
+W_R = theta(2);
 
 
 % Load trajectory to follow
@@ -63,18 +68,18 @@ COM.stiffness = paramsCOM(1:3);
 COM.damping = paramsCOM(4:6);
 COM.z_sum = paramsCOM(7);
 
-
-% Controlled coordinates (upper corners in x,y,z)
-COM_node_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
-COM.coord_ctrl = [COM_node_ctrl, ...
-                  COM_node_ctrl+nxC*nyC, ...
-                  COM_node_ctrl+2*nxC*nyC];
+% Important Coordinates (upper and lower corners in x,y,z)
+COM_nd_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
+COM.coord_ctrl = [COM_nd_ctrl, COM_nd_ctrl+nxC*nyC, COM_nd_ctrl+2*nxC*nyC];
+C_coord_lc = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
+COM.coord_lc = C_coord_lc;
 
               
 % Define the SOM (NONLINEAR)
 nxS = nSOM;
 nyS = nSOM;
 [SOM, pos] = initialize_nl_model(lCloth,nSOM,cCloth,aCloth,Ts);
+S_coord_lc = SOM.coord_lc;
 
 
 % Define initial position of the nodes (needed for ext_force)
@@ -101,108 +106,75 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 
 
 %% Start casADi optimization problem
+
 % Declare model variables
-phi = SX.sym('phi',3*COM.row*COM.col);
-dphi = SX.sym('dphi',3*COM.row*COM.col);
-x = [phi; dphi];
-n_states = length(x); %should be 96 in a 4x4 model
-u = SX.sym('u',6);
+x = [SX.sym('pos',3*nCOM^2,Hp+1);
+     SX.sym('vel',3*nCOM^2,Hp+1)];
+u = SX.sym('u',6,Hp);
+n_states = size(x,1); % 3*2*nxC*nyC
 
-% Define model equations
-x_next = SX.sym('xdot',6*COM.row*COM.col);
-x_next(:) = A_COM*x + B_COM*u + COM.dt*f_COM;
+% Initial parameters of the optimization problem
+P  = SX.sym('P', 2+6, max(n_states, Hp+1)); 
+x0 = P(1, :)';
+u0 = P(2, 1:6)';
+Rp = P(2+(1:6), 1:Hp+1);
 
-% NL Map: (x,u)->(x_next)
-stfun = Function('stfun',{x,u},{x_next});
+x(:,1) = x0;
+delta_u = [u(:,1) - 0*u0, diff(u,1,2)];
 
-% Lower corner coordinates for both models
-coord_lcC = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC]; 
-coord_lcS = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
+% Optimization variables
+w = u(:);
+lbw = -ubound*ones(6*Hp,1);
+ubw = +ubound*ones(6*Hp,1);
 
-% Parameters in the optimization problem: initial state and reference
-P = SX.sym('P',n_states,Hp+1); 
-
-% Start with an empty NLP
-w=[]; %variables to optimize
-lbw = []; %lower bounds
-ubw = []; %upper bounds
-obj = 0; %objective function
-g=[]; %constraints
-lbg = [];
-ubg = [];
-
-% Initial condition (initial state)
-Xk = P(:,1);
-
-% Weigths calculation (adaptive): direction pointing from the actual
-% lower corner position to the desired position at the end of the interval
-ln = P([1 3 5],end) - Xk(coord_lcC([1,3,5])); %ln = left node
-ln = abs(ln)./(norm(ln)+10^-6);
-rn = P([2,4,6],end) - Xk(coord_lcC([2,4,6])); %rn = right node
-rn = abs(rn)./(norm(rn)+10^-6);
-Q = diag([ln(1) rn(1) ln(2) rn(2) ln(3) rn(3)]);
-
-% Q = [xl xr yl yr zl zr]
-%Q = 0.5*diag([1 1 1 1 1 1]);
+% Initialize optimization variables
+objfun = 0;     % Objective function
+g = [];         % Constraints
+lbg = [];       % Lower bounds of g
+ubg = [];       % Upper bounds of g
 
 
-take_x=[];
-take_u=[];
-i=1;
-
-for k = 1:Hp
-    % Artificial reference
-    r_a = SX.sym(['r_a_' num2str(k)],6);
-    w = [w; r_a];
-    
-    lbw = [lbw; -xbound*ones(6,1)]; 
-    ubw = [ubw;  xbound*ones(6,1)];
-    
-    take_x=[take_x;(i:(i+6-1))'];
-    i=i+6;
-    
-    % New NLP variable for the control
-    Uk = SX.sym(['U_' num2str(k)],6);
-    w = [w; Uk];
-    % The bounds of the control action are very relevant! 
-    %   If too large, the COM allows it and the SOM will not
-    %   (the COM is a spring which can be infinetely stretched in a step)
-    lbw = [lbw; -ubound*ones(6,1)]; 
-    ubw = [ubw;  ubound*ones(6,1)];
-
-    take_u=[take_u;(i:(i+6-1))'];
-    i=i+6;
-    
-    % Integrate until the end of the interval
-    Xk_next = stfun(Xk,Uk);
-    Xkn_r = Xk_next(coord_lcC);
-    
-    % Constant distance between upper corners
-    Xkn_u = Xk_next(COM.coord_ctrl);
-    g = [g; sum((Xkn_u([2,4,6]) - Xkn_u([1,3,5])).^2) - lCloth^2 ];
-    lbg = [lbg; -gbound-1e-6];
-    ubg = [ubg;  gbound+1e-6];
-    
-    % Update objective function
-    obj = obj + W_Q*(Xkn_r-r_a)'*Q*(Xkn_r-r_a);
-    obj = obj + W_T*(P(1:6,k+1)-r_a)'*(P(1:6,k+1)-r_a);
-    obj = obj + W_R*(Uk'*Uk);
-
-    Xk = Xk_next;
+% Adaptive weight calculation
+if (opt_Qa == 0)
+    % Disabled: Weigh coordinates constantly only with W_Q
+    Q = 1;
+else
+    % Enabled: From the current LCpos to the desired at the horizon
+    lc_dist = Rp(:,end) - x0(COM.coord_lc);
+    lc_dist = abs(lc_dist)/(norm(lc_dist)+eps);
+    Q = diag(lc_dist);
 end
 
-% Terminal constraint
-g = [g; Xkn_r-r_a ]; 
-lbg = [lbg; -gbound*ones(6,1)];
-ubg = [ubg;  gbound*ones(6,1)];
 
-nlp_prob = struct('f', obj, 'x', w, 'g', g, 'p', P);
-opts = struct;
-opts.print_time = 0;
-opts.ipopt.print_level = 0; %0 to print the minimum, 3 to print the maximum
-opts.ipopt.warm_start_init_point = 'yes'; %warm start
+for k = 1:Hp
+    
+    % Model Dynamics Constraint -> Definition
+    x(:,k+1) = (A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM);
+    
+    % Constraint: Constant distance between upper corners
+    x_ctrl = x(COM.coord_ctrl,k+1);
+    g = [g; sum((x_ctrl([2,4,6]) - x_ctrl([1,3,5])).^2) - lCloth^2 ];
+    lbg = [lbg; -gbound];
+    ubg = [ubg;  gbound];
+    
 
-solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
+    % Objective function
+    x_err = x(COM.coord_lc,k+1) - Rp(:,k+1);
+    objfun = objfun + x_err'*W_Q*Q*x_err;
+    if (opt_du==0)
+        objfun = objfun + u(:,k)'*W_R*u(:,k);
+    else
+        objfun = objfun + delta_u(:,k)'*W_R*delta_u(:,k);
+    end
+end
+
+opt_prob = struct('f', objfun, 'x', w, 'g', g, 'p', P);
+opt_config = struct;
+opt_config.print_time = 0;
+opt_config.ipopt.print_level = 0; %0 min print - 3 max
+opt_config.ipopt.warm_start_init_point = 'yes'; %warm start
+
+controller = nlpsol('ctrl_sol', 'ipopt', opt_prob, opt_config);
 
 
 %----------------------------------%
@@ -210,9 +182,11 @@ solver = nlpsol('solver', 'ipopt', nlp_prob,opts);
 %----------------------------------%
 
 % Initialize control
-u_ini = x_ini_SOM(SOM.coord_ctrl);
-u_bef = u_ini;
-u_SOM = u_ini;
+u_ini  = x_ini_SOM(SOM.coord_ctrl);
+u_lin  = zeros(6,1);
+u_rot1 = u_lin;
+u_bef  = u_ini;
+u_SOM  = u_ini;
 
 % Get initial Cloth orientation (rotation matrix)
 cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
@@ -224,8 +198,21 @@ cloth_y = cloth_y/norm(cloth_y);
 cloth_z = cloth_z/norm(cloth_z);
 Rcloth = [cloth_x cloth_y cloth_z];
 
+% Simulate some SOM steps to stabilize the NL model
+warning('off','MATLAB:nearlySingularMatrix');
+lastwarn('','');
+[p_ini_SOM, ~] = simulate_cloth_step(x_ini_SOM,u_SOM,SOM);
+[~, warnID] = lastwarn;
+while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
+    lastwarn('','');
+    x_ini_SOM = [p_ini_SOM; zeros(3*nxS*nyS,1)];
+    [p_ini_SOM, ~] = simulate_cloth_step(x_ini_SOM,u_SOM,SOM);
+    [~, warnID] = lastwarn;
+end
+warning('on','MATLAB:nearlySingularMatrix');
+
 % Initialize storage
-reference = zeros(6*COM.row*COM.col, Hp+1);
+in_params = zeros(2+6, max(n_states, Hp+1));
 store_state(:,1) = x_ini_SOM;
 store_noisy(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
@@ -236,12 +223,12 @@ printX = floor(nPtRef/5);
 for tk=2:nPtRef
     
     % The last Hp timesteps, trajectory should remain constant
-    if tk>=nPtRef-Hp 
-        Traj_l_Hp = repmat(Ref_l(end,:), Hp,1);
-        Traj_r_Hp = repmat(Ref_r(end,:), Hp,1);
+    if tk>=nPtRef-(Hp+1)
+        Ref_l_Hp = repmat(Ref_l(end,:), Hp+1,1);
+        Ref_r_Hp = repmat(Ref_r(end,:), Hp+1,1);
     else
-        Traj_l_Hp = Ref_l(tk:tk+Hp-1,:);
-        Traj_r_Hp = Ref_r(tk:tk+Hp-1,:);
+        Ref_l_Hp = Ref_l(tk:tk+Hp,:);
+        Ref_r_Hp = Ref_r(tk:tk+Hp,:);
     end
     
     % Rotate initial position to cloth base
@@ -254,30 +241,26 @@ for tk=2:nPtRef
                      reshape(vel_ini_COM_rot,[3*nxC*nyC,1])];
                  
     % Rotate reference trajectory to cloth base
-    Traj_l_Hp_rot = (Rcloth^-1 * Traj_l_Hp')';
-    Traj_r_Hp_rot = (Rcloth^-1 * Traj_r_Hp')';
+    Ref_l_Hp_rot = (Rcloth^-1 * Ref_l_Hp')';
+    Ref_r_Hp_rot = (Rcloth^-1 * Ref_r_Hp')';
     
-    % Define reference in the prediction horizon (moving window)
-    reference(:,1) = x_ini_COM_rot;
-    reference(1,2:end) = Traj_l_Hp_rot(:,1)';
-    reference(2,2:end) = Traj_r_Hp_rot(:,1)';
-    reference(3,2:end) = Traj_l_Hp_rot(:,2)';
-    reference(4,2:end) = Traj_r_Hp_rot(:,2)';
-    reference(5,2:end) = Traj_l_Hp_rot(:,3)';
-    reference(6,2:end) = Traj_r_Hp_rot(:,3)';
+    % Define input parameters for the optimizer (sliding window)
+    in_params(1,:) = x_ini_COM_rot';
+    in_params(2,1:6) = u_rot1';
+    in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
+    in_params(2+[2,4,6],1:Hp+1) = Ref_r_Hp_rot';
     
-    % Initial seed of the optimization (for "u" and "r^a")
-    % Add cloth size to z for LC->UC
-    args_x0 = repmat([reference(1:6,end)+[0;0;0;0;lCloth;lCloth];zeros(6,1)],Hp,1);
+    % Initial guess for optimizer (u: increments, guess UC=LC=Ref)
+    args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
     
     % Find the solution "sol"
-    sol = solver('x0', args_x0, 'lbx', lbw, 'ubx', ubw, ...
-                 'lbg', lbg, 'ubg', ubg, 'p', reference);
+    sol = controller('x0', args_x0, 'lbx', lbw, 'ubx', ubw, ...
+                     'lbg', lbg, 'ubg', ubg, 'p', in_params);
 
     % Get only controls from the solution
     % Control actions are upper corner displacements (incremental pos)
     % And they are in local base
-    u_rot = reshape(full(sol.x(take_u)),6,Hp)'; 
+    u_rot = reshape(full(sol.x),6,Hp)'; 
     u_rot1 = u_rot(1,1:end)';
     u_rot2 = [u_rot1([1 3 5]) u_rot1([2 4 6])];
     
@@ -333,16 +316,18 @@ fprintf([' -- Total time: \t',num2str(tT),' s \n', ...
 
 
 %% KPI and Reward
-error_l = 1000*(store_state(coord_lcS([1,3,5]),:)'-Ref_l);
-error_r = 1000*(store_state(coord_lcS([2,4,6]),:)'-Ref_r);
+error_l = 1000*(store_state(S_coord_lc([1,3,5]),:)'-Ref_l);
+error_r = 1000*(store_state(S_coord_lc([2,4,6]),:)'-Ref_r);
 
-eMAE = mean(abs([error_l error_r]));
+%eMAE = mean(abs([error_l error_r]));
+%eMAEp  = mean([norm(eMAE([1,3,5]),2) norm(eMAE([2,4,6]),2)]);
 eRMSE = sqrt(mean([error_l error_r].^2));
-eMAEp  = mean([norm(eMAE([1,3,5]),2) norm(eMAE([2,4,6]),2)]);
 eRMSEp = mean([norm(eRMSE([1,3,5]),2) norm(eRMSE([2,4,6]),2)]);
-eRwds = -[eMAEp eRMSEp];
+eTov = max(tT/(nPtRef*Ts) - 1, 0);
 
-Rwd = eRwds(2); %RMSE
+eRwds = -[eRMSEp eTov eRMSEp+eTov];
+Rwd = eRwds(RwdType);
+
 fprintf([' -- Sim. Reward: \t', num2str(Rwd), '\n']);
 if isnan(Rwd)
     Rwd = -inf;
