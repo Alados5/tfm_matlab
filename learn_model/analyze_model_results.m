@@ -11,8 +11,8 @@ MainColNames = {'ExpSetN','NExp','NTrial','Ts','nSOM','nCOM'};
 MdlData = MdlData(:, [MainColNames(:)', ThColNames(:)']);
 ThCols = contains(MdlData.Properties.VariableNames, 'Th_');
 
-% Remove trajectories not fit for learning
-MdlData = MdlData(MdlData.ExpSetN~=11,:);
+% Remove exps and trajectories not fit for learning
+MdlData = MdlData(~sum(MdlData.ExpSetN==[0:2,11], 2), :);
 MdlData = MdlData(~sum(MdlData.NExp==[1:3,6,10:13], 2), :);
 MdlData = MdlData(~sum(MdlData.NTrial==3, 2), :);
 
