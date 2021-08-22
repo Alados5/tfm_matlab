@@ -21,10 +21,7 @@ Ts = 0.020;
 Hp = 25;
 nSOM = 4;
 nCOM = 4;
-ExpSetN = 4;
-NExp = 8;
-NTrial = 2;
-zsum0 = 0*+0.002;
+zsum0 = 0.002;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
@@ -32,12 +29,13 @@ ubound = 50*1e-3; %5*1e-3
 gbound = 0; % (Eq. Constraint)
 W_Q = 0.01;
 W_R = 1.00;
-opt_du = 1;
-opt_Qa = 0;
+opt_du  = 1;
+opt_Qa  = 0;
+opt_sto = 1;
 
 % Noise parameters
-sigmaD = 0.020; %0.020;
-sigmaN = 0.004; %0.004;
+sigmaD = opt_sto*0.020; %0.020;
+sigmaN = opt_sto*0.004; %0.004;
 % ---------------------
 
 
