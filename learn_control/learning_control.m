@@ -1,12 +1,12 @@
 close all; clc; clear;
 
 %% Initialization
-ExpSetN = 3;
+ExpSet = 3;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Det_W1_RwdE_Qk_Du';
 NTraj = 6;
-Ts = 0.015;
-Hp = 30;
+Ts = 0.020;
+Hp = 25;
 Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
@@ -17,12 +17,12 @@ sigmaN = 0.0;
 ubound  = 50*1e-3;  % (Enough Displ.)
 gbound  = 0;        % (Eq. Constraint)
 
-opt_du  = 1;  % 0=u,      1=Du
+opt_Du  = 1;  % 0=u,      1=Du
 opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
 opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
 opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
-e0 = 5;
+e0 = 0;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
@@ -61,7 +61,7 @@ opts.sigmaD = sigmaD;
 opts.sigmaN = sigmaN;
 opts.ubound = ubound;
 opts.gbound = gbound;
-opts.opt_du = opt_du;
+opts.opt_du = opt_Du;
 opts.opt_Qa = opt_Qa;
 opts.opt_Rwd = opt_Rwd;
 opts.paramsSOM = paramsSOM;
@@ -72,9 +72,11 @@ opts.paramsCOM = paramsCOM;
 % Simulation type categorization
 if strcmp(SimType, 'LIN')
     SimTypeN = 0;
+    Wv=0; nNLM=0;
     wvname = '';
 elseif strcmp(SimType, 'NL')
     SimTypeN = 1;
+    Wv=0; nNLM=0;
     wvname = '';
 elseif strcmp(SimType, 'RTM') || strcmp(SimType, 'RT')
     SimTypeN = 2;
@@ -102,7 +104,7 @@ else
 end
 
 % Directory name
-dirname = ['Exps',num2str(ExpSetN), '/',num2str(SimTypeN), ...
+dirname = ['Exps',num2str(ExpSet), '/',num2str(SimTypeN), ...
            '_', SimType, ExpNote, ...
            '/traj',num2str(NTraj), '_ts',num2str(Ts*1000), ...
            '_hp',num2str(Hp), wvname, ...
@@ -274,8 +276,11 @@ for epoch=1:size(MW2D,2)
     end
     RWMW(epoch) = Rwd;
 end
-ThLearnt = MW2D(:,end)';
-fprintf(['\nLearnt Theta: [',num2str(ThLearnt,5),']\n']);
+ResLearnt = [AllData.eRMSE, AllData.eTov];
+ThLearnt  = MW2D(:,end);
+ThLearnt6 = ThM6(ThLearnt);
+ThLearnt6 = [ThLearnt6(1,[1,3,5]) ThLearnt6(2,[1,3,5])];
+fprintf(['\nLearnt Theta: [',num2str(ThLearnt6,5),']\n']);
 
 % Save data
 save([dirname,'/RWMW_',epochrange,'.mat'],'RWMW');
@@ -425,7 +430,7 @@ end
 
 %% Update LUT for Parameters
 ThetaCtrlLUT = readtable('ThetaControlLUT.csv');
-LUT_Exp_id = (ThetaCtrlLUT.ExpSetN == ExpSetN) & ...
+LUT_Exp_id = (ThetaCtrlLUT.ExpSetN == ExpSet) & ...
              (ThetaCtrlLUT.NTraj == NTraj) & ...
              (ThetaCtrlLUT.SimType == SimTypeN) & ...
              (ThetaCtrlLUT.Ts == Ts) & (ThetaCtrlLUT.Hp == Hp) & ...
@@ -439,26 +444,44 @@ if (size(LUT_Exp,1) > 1)
 elseif (size(LUT_Exp,1) == 1)
     % Update experiment row
     LUT_row = find(LUT_Exp_id);
-    ThetaCtrlLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
-    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(1)};
-    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(2)};
+    ThetaCtrlLUT(LUT_row,'nEps') = {e0+NEpochs};
+    ThetaCtrlLUT(LUT_row,'Qx')   = {ThLearnt6(1)};
+    ThetaCtrlLUT(LUT_row,'Qy')   = {ThLearnt6(2)};
+    ThetaCtrlLUT(LUT_row,'Qz')   = {ThLearnt6(3)};
+    ThetaCtrlLUT(LUT_row,'Rx')   = {ThLearnt6(4)};
+    ThetaCtrlLUT(LUT_row,'Ry')   = {ThLearnt6(5)};
+    ThetaCtrlLUT(LUT_row,'Rz')   = {ThLearnt6(6)};
+    ThetaCtrlLUT(LUT_row,'RMSE') = {ResLearnt(1)};
+    ThetaCtrlLUT(LUT_row,'TOV')  = {ResLearnt(2)};
 else
     % Add experiment row
     LUT_row = size(ThetaCtrlLUT,1)+1;
-    ThetaCtrlLUT(LUT_row,'ExpSetN') = {ExpSetN};
-    ThetaCtrlLUT(LUT_row,'SimType') = {SimTypeN};
+    ThetaCtrlLUT(LUT_row,'Exps')  = {ExpSet};
+    ThetaCtrlLUT(LUT_row,'Sim')   = {SimTypeN};
     ThetaCtrlLUT(LUT_row,'NTraj') = {NTraj};
-    ThetaCtrlLUT(LUT_row,'Ts') = {Ts};
-    ThetaCtrlLUT(LUT_row,'Hp') = {Hp};
-    ThetaCtrlLUT(LUT_row,'nSOM') = {nSOM};
-    ThetaCtrlLUT(LUT_row,'nCOM') = {nCOM};
-    ThetaCtrlLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
-    ThetaCtrlLUT(LUT_row,'NEpochs') = {NEpochs};
-    ThetaCtrlLUT(LUT_row,'NSamples') = {NSamples};
-    ThetaCtrlLUT(LUT_row,'MinRwd') = {minRwd};
+    ThetaCtrlLUT(LUT_row,'Ts')    = {Ts};
+    ThetaCtrlLUT(LUT_row,'Hp')    = {Hp};
+    ThetaCtrlLUT(LUT_row,'Wv')    = {Wv};
+    ThetaCtrlLUT(LUT_row,'nSOM')  = {nSOM};
+    ThetaCtrlLUT(LUT_row,'nCOM')  = {nCOM};
+    ThetaCtrlLUT(LUT_row,'nNLM')  = {nNLM};
+    ThetaCtrlLUT(LUT_row,'sD')    = {sigmaD};
+    ThetaCtrlLUT(LUT_row,'sN')    = {sigmaN};
+    ThetaCtrlLUT(LUT_row,'Du')    = {opt_Du};
+    ThetaCtrlLUT(LUT_row,'Qa')    = {opt_Qa};
+    ThetaCtrlLUT(LUT_row,'fRw')   = {opt_Rwd};
+    ThetaCtrlLUT(LUT_row,'Wgh')   = {opt_Wgh};
+    ThetaCtrlLUT(LUT_row,'mRw')   = {minRwd};
     
-    ThetaCtrlLUT(LUT_row,'Th_WQ') = {ThLearnt(1)};
-    ThetaCtrlLUT(LUT_row,'Th_WR') = {ThLearnt(2)};
+    ThetaCtrlLUT(LUT_row,'nEps') = {e0+NEpochs};
+    ThetaCtrlLUT(LUT_row,'Qx')   = {ThLearnt6(1)};
+    ThetaCtrlLUT(LUT_row,'Qy')   = {ThLearnt6(2)};
+    ThetaCtrlLUT(LUT_row,'Qz')   = {ThLearnt6(3)};
+    ThetaCtrlLUT(LUT_row,'Rx')   = {ThLearnt6(4)};
+    ThetaCtrlLUT(LUT_row,'Ry')   = {ThLearnt6(5)};
+    ThetaCtrlLUT(LUT_row,'Rz')   = {ThLearnt6(6)};
+    ThetaCtrlLUT(LUT_row,'RMSE') = {ResLearnt(1)};
+    ThetaCtrlLUT(LUT_row,'TOV')  = {ResLearnt(2)};
 end
 writetable(ThetaCtrlLUT,'ThetaControlLUT.csv');
 fprintf('Updated ThetaControlLUT.csv\n');

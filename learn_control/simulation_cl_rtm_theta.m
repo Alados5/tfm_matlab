@@ -399,6 +399,8 @@ AllData.xSOM = store_somstate;
 AllData.uSOM = store_somstate(SOM.coord_ctrl,:);
 AllData.xNLM = store_nlmstate;
 AllData.ulin = store_u;
+AllData.eRMSE = eRMSEp;
+AllData.eTov  = tT/(nPtRef*Ts);
 
 
 end

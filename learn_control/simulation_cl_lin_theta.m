@@ -358,6 +358,8 @@ AllData.xSOM  = store_state;
 AllData.xSOMn = store_noisy;
 AllData.uSOM  = store_state(SOM.coord_ctrl,:);
 AllData.ulin  = store_u;
+AllData.eRMSE = eRMSEp;
+AllData.eTov  = tT/(nPtRef*Ts);
 
 
 end
