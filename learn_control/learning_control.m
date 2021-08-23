@@ -3,7 +3,7 @@ close all; clc; clear;
 %% Initialization
 ExpSet = 3;
 SimType = 'LIN'; %LIN, NL, RTM
-ExpNote = '_Det_W1_RwdE_Qk_Du';
+ExpNote = '_Det_W1_RwdET_Qk_u';
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
@@ -16,12 +16,12 @@ sigmaN = 0.0;
 ubound  = 50*1e-3;  % (Enough Displ.)
 gbound  = 0;        % (Eq. Constraint)
 
-opt_Du  = 1;  % 0=u,      1=Du
+opt_Du  = 0;  % 0=u,      1=Du
 opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
-opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
+opt_Rwd = 3;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
 opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
-e0 = 20;
+e0 = 0;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
@@ -279,7 +279,9 @@ ResLearnt = [AllData.eRMSE, AllData.eTov];
 ThLearnt  = MW2D(:,end);
 ThLearnt6 = ThM6(ThLearnt);
 ThLearnt6 = [ThLearnt6(1,[1,3,5]) ThLearnt6(2,[1,3,5])];
-fprintf(['\nLearnt Theta: [',num2str(ThLearnt6,5),']\n']);
+fprintf(['\nLearnt Theta:  [',num2str(ThLearnt6,5),']']);
+fprintf(['\nFinal Results: [RMSE = ',num2str(ResLearnt(1),5),', \t' ...
+           'TOV = ',num2str(ResLearnt(2),5),']\n']);
 
 % Save data
 save([dirname,'/RWMW_',epochrange,'.mat'],'RWMW');
