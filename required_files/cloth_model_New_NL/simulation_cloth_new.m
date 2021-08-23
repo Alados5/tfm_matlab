@@ -12,7 +12,7 @@ cpt = [0,0.5,l_side/2];
 
 
 %% Initialize model
-[SOM, X0] = initialize_nl_model(l_side,n_side,cpt,dt);
+[SOM, X0] = initialize_nl_model(l_side,n_side,cpt,0,dt);
 %posaux = X0;
 %X0(:,1) = posaux(:,2);
 %X0(:,2) = -posaux(:,1);
