@@ -254,7 +254,7 @@ store_pose(1) = struct('position', tcp_ini, ...
 
 tT0 = tic;
 t0 = tic;
-printX = 50;
+printX = 100;
 for tk=2:nPtRef
     
     % The last Hp+1 timesteps, trajectory should remain constant

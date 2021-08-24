@@ -38,20 +38,6 @@ sigmaD = opt_sto*0.020; %0.020;
 sigmaN = opt_sto*0.004; %0.004;
 % ---------------------
 
-
-% Notes for tested Model Parameters
-%{
-ExpSetN = 3; NExp = 8; NTrial = 2;      % Set 3 (Real, no trim/pad)
-if(Ts == 0.015), zsum0 = +0.010; end;   % Enable with previous
-ExpSetN = 4; NExp = 8; NTrial = 1;      % Set 4 (Real, trim+pad=100)
-ExpSetN = 4; NExp = 8; NTrial = 2;      % Set 4 (Real, trim+pad=100)
-if(Ts == 0.015), zsum0 = +0.005; end;   % Enable with previous
-if(Ts == 0.025), zsum0 = -0.002; end;   % Enable with previous
-ExpSetN = 4; NExp = 9; NTrial = 1;      % Set 4 (Real, trim+pad=100)
-%}
-
-
-
 % Load trajectory to follow
 Ref_l = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
 Ref_r = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
@@ -90,6 +76,12 @@ COM.dt = Ts;
 COM.stiffness = theta(1:3);
 COM.damping = theta(4:6);
 COM.z_sum = theta(7) + zsum0;
+%{
+% To use the original model
+COM.stiffness = [-305.6028  -13.4221 -225.8987]; 
+COM.damping = [-4.0042   -2.5735   -3.9090]; 
+COM.z_sum = 0.0312;
+%}
 
 % Important Coordinates (upper and lower corners in x,y,z)
 COM_nd_ctrl = [nxC*(nyC-1)+1, nxC*nyC];
@@ -258,9 +250,10 @@ store_u(:,1) = zeros(6,1);
 store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
 
-tT0 = tic;
-t0 = tic;
-printX = 50;
+tT = 0;
+t1 = tic;
+t2 = tic;
+printX = 100;
 for tk=2:nPtRef
     
     % The last Hp+1 timesteps, trajectory should remain constant
@@ -295,6 +288,7 @@ for tk=2:nPtRef
     args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
     
     % Find the solution "sol"
+    t0 = tic;
     sol = controller('x0', args_x0, 'lbx', lbw, 'ubx', ubw, ...
                      'lbg', lbg, 'ubg', ubg, 'p', in_params);
 
@@ -335,6 +329,7 @@ for tk=2:nPtRef
     x_distd = store_state(:,tk-1) + x_dist*(tk>10);
     
     % Simulate a step of the SOM
+    tT=tT+toc(t0);
     [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_distd,u_SOM,SOM);
     
     % Add sensor noise to positions
@@ -353,13 +348,14 @@ for tk=2:nPtRef
     
     % Display progress
     if(mod(tk,printX)==0)
-        t10 = toc(t0)*1000;
+        t20 = toc(t2)*1000;
         fprintf(['Iter: ', num2str(tk), ...
-            ' \t Avg. time/iter: ', num2str(t10/printX), ' ms \n']);
-        t0 = tic;
+            ' \t Avg. time/iter: ', num2str(t20/printX), ' ms \n']);
+        t2 = tic;
     end
 end
-tT = toc(tT0);
+tT = tT + toc(t0);
+tT1 = toc(t1);
 fprintf(['-----------------------------------------\n', ...
          ' -- Total time: \t',num2str(tT),' s \n', ...
          ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
