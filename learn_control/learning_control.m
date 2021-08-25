@@ -3,7 +3,7 @@ close all; clc; clear;
 %% Initialization
 ExpSet = 3;
 SimType = 'LIN'; %LIN, NL, RTM
-ExpNote = '_Det_W3_RwdE_Qk_u';
+ExpNote = '_Det_W3_RwdET_Qk_u';
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
@@ -18,10 +18,10 @@ gbound  = 0;        % (Eq. Constraint)
 
 opt_Du  = 0;  % 0=u,      1=Du
 opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
-opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
+opt_Rwd = 3;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
 opt_Wgh = 3;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
-e0 = 45;
+e0 = 0;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
