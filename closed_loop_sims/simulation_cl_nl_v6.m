@@ -16,22 +16,22 @@ plotAnim = 0;
 animwWAM = 0;
 
 % General Parameters
-NTraj = 6;
-Ts = 0.020;
-Hp = 25;
-nSOM = 4;
+NTraj = 16;
+Ts = 0.015;
+Hp = 30;
+nSOM = 10;
 nCOM = 4;
-zsum0 = 0.002;
+zsum0 = 0.003;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
-ubound = 50*1e-3; %5*1e-3
+ubound = 100*1e-3; %5*1e-3
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.01;
+W_Q = 0.05;
 W_R = 1.00;
-opt_du  = 1;
+opt_du  = 0;
 opt_Qa  = 0;
-opt_sto = 1;
+opt_sto = 0;
 
 % Noise parameters
 sigmaD = opt_sto*0.020; %0.020;
@@ -325,7 +325,7 @@ for tk=2:nPtRef
     PoseTCP.orientation = rotm2quat(Rtcp);
     
     % Add disturbance to SOM positions
-    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_dist = [normrnd(0,sigmaD^2,[3*nSOM^2,1]); zeros(3*nSOM^2,1)];
     x_distd = store_state(:,tk-1) + x_dist*(tk>10);
     
     % Simulate a step of the SOM
@@ -333,7 +333,7 @@ for tk=2:nPtRef
     [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_distd,u_SOM,SOM);
     
     % Add sensor noise to positions
-    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
+    pos_noise = normrnd(0,sigmaN^2,[3*nSOM^2,1]);
     pos_noisy = pos_nxt_SOM + pos_noise*(tk>10);
     
     % Get COM states from SOM (Close the loop)
