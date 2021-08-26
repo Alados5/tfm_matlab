@@ -358,7 +358,8 @@ tT = tT + toc(t0);
 tT1 = toc(t1);
 fprintf(['-----------------------------------------\n', ...
          ' -- Total time: \t',num2str(tT),' s \n', ...
-         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
+         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n', ...
+         '[Times without SOM simulation, extra ',num2str(tT1-tT),' s] \n']);
 
 
 %% COMPARE MODELS

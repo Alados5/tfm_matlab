@@ -271,11 +271,12 @@ store_u(:,1) = zeros(6,1);
 store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
 
-tT0 = tic;
-t0 = tic;
-printX = 50;
+tT = 0;
+t1 = tic;
+t2 = tic;
+printX = 100;
 for tk=2:nPtRef
-    
+    t0 = tic;
     % Get new noisy feedback value (eq. to "Spin once")
     x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
     x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>10);
@@ -352,6 +353,7 @@ for tk=2:nPtRef
     
     % Simulate a SOM step
     next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
+    tT=tT+toc(t0);
     
     % Add disturbance to NLM positions
     x_dist = [normrnd(0,sigmaD^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
@@ -391,16 +393,18 @@ for tk=2:nPtRef
     store_pose(tk) = PoseTCP;
     
     if(mod(tk,printX)==0)
-        t10 = toc(t0)*1000;
+        t20 = toc(t2)*1000;
         fprintf(['Iter: ', num2str(tk), ...
-            ' \t Avg. time/iter: ', num2str(t10/printX), ' ms \n']);
-        t0 = tic;
+            ' \t Avg. time/iter: ', num2str(t20/printX), ' ms \n']);
+        t2 = tic;
     end
 end
-tT = toc(tT0);
+tT = tT + toc(t0);
+tT1 = toc(t1);
 fprintf(['-----------------------------------------\n', ...
          ' -- Total time: \t',num2str(tT),' s \n', ...
-         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
+         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n', ...
+         '[Times without NLM simulation, extra ',num2str(tT1-tT),' s] \n']);
 
 time = 0:Ts:size(store_somstate,2)*Ts-Ts;
 
