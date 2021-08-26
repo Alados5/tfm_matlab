@@ -246,10 +246,10 @@ store_nlmstate(:,1) = x_ini_NLM;
 store_nlmnoisy(:,1) = x_ini_NLM;
 store_u(:,1) = zeros(6,1);
 
-tT0 = tic;
-t0 = tic;
+tT = 0;
 printX = floor(nPtRef/5);
 for tk=2:nPtRef
+    t0 = tic;
     
     % Get new feedback value (eq. to "Spin once")
     x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
@@ -327,6 +327,7 @@ for tk=2:nPtRef
     
     % Simulate a SOM step
     next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
+    tT=tT+toc(t0);
     
     % Add disturbance to NLM positions
     x_dist = [normrnd(0,sigmaD^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
@@ -358,13 +359,11 @@ for tk=2:nPtRef
     store_u(:,tk) = u_lin;
     
     if(mod(tk,printX)==0)
-        t10 = toc(t0)*1000;
         fprintf(['Iter: ', num2str(tk), ...
-            ' \t Avg. time/iter: ', num2str(t10/printX), ' ms \n']);
-        t0 = tic;
+            ' \t Avg. time/iter: ', num2str(tT/tk*1000), ' ms \n']);
     end
 end
-tT = toc(tT0);
+tT = tT + toc(t0);
 fprintf([' -- Total time: \t',num2str(tT),' s \n', ...
          ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
 

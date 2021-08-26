@@ -277,6 +277,7 @@ t2 = tic;
 printX = 100;
 for tk=2:nPtRef
     t0 = tic;
+    
     % Get new noisy feedback value (eq. to "Spin once")
     x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
     x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>10);
