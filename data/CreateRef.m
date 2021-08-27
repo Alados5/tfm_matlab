@@ -189,35 +189,35 @@ elseif NRef == 16
                                 [zeros(2,2*NT);
                                 -linspace(0.0005,0.050,2*NT).*ones(2,1);
                                 -linspace(0.0005,0.050,2*NT).*ones(2,1)];
-    TrajR(:,9*NT+1:11*NT) = TrajR(:,9*NT)*ones(1,2*NT) + ...
-                                [lCloth/2*(1-cos(linspace(0.0005,2*pi/3,2*NT)));
-                                -lCloth/2*(1-cos(linspace(0.0005,2*pi/3,2*NT)));
-                                -lCloth/2*sin(linspace(0.0005,2*pi/3,2*NT));
-                                 lCloth/2*sin(linspace(0.0005,2*pi/3,2*NT));
-                                 zeros(2,2*NT)];
-    TrajR(:,11*NT+1:12*NT) = TrajR(:,11*NT)*ones(1,1*NT) + ...
+    TrajR(:,9*NT+1:13*NT) = TrajR(:,9*NT)*ones(1,4*NT) + ...
+                                [lCloth/2*(1-cos(linspace(0.0005,2*pi/3,4*NT)));
+                                -lCloth/2*(1-cos(linspace(0.0005,2*pi/3,4*NT)));
+                                -lCloth/2*sin(linspace(0.0005,2*pi/3,4*NT));
+                                 lCloth/2*sin(linspace(0.0005,2*pi/3,4*NT));
+                                 zeros(2,4*NT)];
+    TrajR(:,13*NT+1:14*NT) = TrajR(:,13*NT)*ones(1,1*NT) + ...
                                 [zeros(2,1*NT);
                                  zeros(2,1*NT);
                                 -linspace(0.001,0.10,1*NT).*ones(2,1)];
-    TrajR(:,12*NT+1:14*NT) = TrajR(:,12*NT)*ones(1,2*NT) + ...
-                                [linspace(0.001,0.10,2*NT).*ones(2,1);
-                                 linspace(0.001,0.10,2*NT).*ones(2,1);
-                                 zeros(2,2*NT)];
-    TrajR(:,14*NT+1:16*NT) = TrajR(:,14*NT)*ones(1,2*NT) + ...
+    TrajR(:,14*NT+1:18*NT) = TrajR(:,14*NT)*ones(1,4*NT) + ...
+                                [linspace(0.0005,0.10,4*NT).*ones(2,1);
+                                 linspace(0.0005,0.10,4*NT).*ones(2,1);
+                                 zeros(2,4*NT)];
+    TrajR(:,18*NT+1:20*NT) = TrajR(:,18*NT)*ones(1,2*NT) + ...
                                 [linspace(0.0005,0.050,2*NT).*ones(2,1);
                                 -linspace(0.0005,0.050,2*NT).*ones(2,1);
                                  zeros(2,2*NT)];
                              
-    TrajR(:,16*NT+1:16.5*NT) = TrajR(:,11*NT:-1:10.5*NT+1) - TrajR(:,11*NT) + TrajR(:,16*NT);
-    TrajR(:,16.5*NT+1:17*NT) = TrajR(:,16.5*NT)*ones(1,0.5*NT) + ...
-                                [zeros(2,0.5*NT);
-                                 zeros(2,0.5*NT);
-                                 linspace(0.0005,0.050,0.5*NT).*ones(2,1)];
-    TrajR(:,17*NT+1:19*NT) = TrajR(:,17*NT)*ones(1,2*NT) + ...
+    TrajR(:,20*NT+1:21*NT) = TrajR(:,13*NT:-1:12*NT+1) - TrajR(:,13*NT) + TrajR(:,20*NT);
+    TrajR(:,21*NT+1:22*NT) = TrajR(:,21*NT)*ones(1,1*NT) + ...
+                                [zeros(2,1*NT);
+                                 zeros(2,1*NT);
+                                 linspace(0.0005,0.050,1*NT).*ones(2,1)];
+    TrajR(:,22*NT+1:24*NT) = TrajR(:,22*NT)*ones(1,2*NT) + ...
                                 [linspace(0.001,0.10,2*NT).*ones(2,1);
-                                 linspace(0.001,0.10,2*NT).*ones(2,1);
+                                 zeros(2,2*NT);
                                  zeros(2,2*NT)];
-
+    TrajR(:,24*NT+1:26*NT) = TrajR(:,24*NT)*ones(1,2*NT);
     
     
     
