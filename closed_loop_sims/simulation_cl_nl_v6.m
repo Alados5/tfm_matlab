@@ -17,7 +17,7 @@ animwWAM = 0;
 
 % General Parameters
 NTraj = 16;
-Ts = 0.015;
+Ts = 0.01;
 Hp = 30;
 nSOM = 10;
 nCOM = 4;
