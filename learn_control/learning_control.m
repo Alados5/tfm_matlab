@@ -3,7 +3,7 @@ close all; clc; clear;
 %% Initialization
 ExpSet = 3;
 SimType = 'RTM'; %LIN, NL, RTM
-ExpNote = '_Det_W1_RwdE_Qk_Du';
+ExpNote = '_Det_W1_RwdE_Qa_u';
 NTraj = 6;
 Ts = 0.020;
 Hp = 25;
@@ -16,8 +16,8 @@ sigmaN = 0.0;
 ubound  = 50*1e-3;  % (Enough Displ.)
 gbound  = 0;        % (Eq. Constraint)
 
-opt_Du  = 1;  % 0=u,      1=Du
-opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
+opt_Du  = 0;  % 0=u,      1=Du
+opt_Qa  = 1;  % 0=Qk,     1=Qa*Qk
 opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
 opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
@@ -28,7 +28,7 @@ NEpochs = 5;
 UseLambda = 1;
 
 Plot3DTraj = 0;
-Plot2DTraj = 1;
+Plot2DTraj = (e0==0);
 
 
 % Load parameter table and select corresponding row
