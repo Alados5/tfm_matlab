@@ -15,8 +15,8 @@ import casadi.*
 
 % General Parameters
 NTraj = 6;
-Ts = 0.020;
-Hp = 25;
+Ts = 0.010;
+Hp = 15;
 Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
@@ -33,8 +33,8 @@ opt_Qa  = 0;
 opt_sto = 1;
 
 % Noise parameters
-sigmaD = 0.050; %0.050;
-sigmaN = 0.050; %0.050;
+sigmaD = 0.003; % m/s
+sigmaN = 0.003; % m
 
 % Plotting options
 plotAnim = 0;
@@ -137,16 +137,16 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 [A_SOM, B_SOM, f_SOM] = create_model_linear_matrices(SOM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
-Bd_COM = [[1 0 0].*ones(nCOM^2,1);
+Bd_COM = [zeros(3*nCOM^2,3);
+          [1 0 0].*ones(nCOM^2,1);
           [0 1 0].*ones(nCOM^2,1);
-          [0 0 1].*ones(nCOM^2,1);
-          zeros(3*nCOM^2,3)];
-Bd_COM(COM.coord_ctrl,:) = 0;
-Bd_SOM = [[1 0 0].*ones(nSOM^2,1);
+          [0 0 1].*ones(nCOM^2,1)];
+Bd_COM(3*nCOM^2+COM.coord_ctrl,:) = 0;
+Bd_SOM = [zeros(3*nSOM^2,3);
+          [1 0 0].*ones(nSOM^2,1);
           [0 1 0].*ones(nSOM^2,1);
-          [0 0 1].*ones(nSOM^2,1);
-          zeros(3*nSOM^2,3)];
-Bd_SOM(SOM.coord_ctrl,:) = 0;
+          [0 0 1].*ones(nSOM^2,1)];
+Bd_SOM(3*nSOM^2+SOM.coord_ctrl,:) = 0;
 
 
 % Third model as a real cloth representation (NL)
@@ -155,11 +155,11 @@ x_ini_NLM = [reshape(pos_nl,[3*nNLM^2 1]); zeros(3*nNLM^2,1)];
 NL_coord_lc = NLM.coord_lc; 
 n_states_nl = 3*2*nNLM^2;
 
-Bd_NLM = [[1 0 0].*ones(nNLM^2,1);
+Bd_NLM = [zeros(3*nNLM^2,3)
+          [1 0 0].*ones(nNLM^2,1);
           [0 1 0].*ones(nNLM^2,1);
-          [0 0 1].*ones(nNLM^2,1);
-          zeros(3*nNLM^2,3)];
-Bd_NLM(NLM.coord_ctrl,:) = 0;
+          [0 0 1].*ones(nNLM^2,1)];
+Bd_NLM(3*nNLM^2+NLM.coord_ctrl,:) = 0;
 
 
 %% Start casADi optimization problem
@@ -301,7 +301,7 @@ for tk=2:nPtRef
     t0 = tic;
     
     % Get new noisy feedback value (eq. to "Spin once")
-    x_noise_nl = [normrnd(0,sigmaN^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
+    x_noise_nl = [normrnd(0,sigmaN,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
     x_noisy_nl = store_nlmstate(:,tk-1) + x_noise_nl*(tk>10);
     
     [phi_noisy, dphi_noisy] = take_reduced_mesh(x_noisy_nl(1:3*nNLM^2), ...
@@ -343,7 +343,7 @@ for tk=2:nPtRef
     in_params(2,1:6) = u_rot1';
     in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
     in_params(2+[2,4,6],1:Hp+1) = Ref_r_Hp_rot';
-    in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD^2,[3,Hp]); % d_hat
+    in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD,[3,Hp]); % d_hat
     
     % Initial guess for optimizer (u: increments, guess UC=LC=Ref)
     args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
@@ -380,7 +380,7 @@ for tk=2:nPtRef
     tT=tT+toc(t0);
     
     % Add disturbance to NLM positions
-    x_dist = Bd_NLM*normrnd(0,sigmaD^2,[3,1]);
+    x_dist = Bd_NLM*normrnd(0,sigmaD,[3,1]);
     x_distd = store_nlmstate(:,tk-1) + x_dist;
     
     % Simulate a NLM step

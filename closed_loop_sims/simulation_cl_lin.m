@@ -12,8 +12,8 @@ import casadi.*
 
 % General Parameters
 NTraj = 6;
-Ts = 0.02;
-Hp = 25;
+Ts = 0.01;
+Hp = 15;
 nSOM = 4;
 nCOM = 4;
 TCPOffset_local = [0; 0; 0.09];
@@ -28,8 +28,8 @@ opt_Qa  = 0;
 opt_sto = 1;
 
 % Noise parameters
-sigmaD = 0.050; %0.050;
-sigmaN = 0.050; %0.050;
+sigmaD = 0.003; % m/s
+sigmaN = 0.004; % m
 
 % Plotting options
 plotAnim = 0;
@@ -136,16 +136,16 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 [A_SOM, B_SOM, f_SOM] = create_model_linear_matrices(SOM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
-Bd_COM = [[1 0 0].*ones(nxC*nyC,1);
+Bd_COM = [zeros(3*nxC*nyC,3);
+          [1 0 0].*ones(nxC*nyC,1);
           [0 1 0].*ones(nxC*nyC,1);
-          [0 0 1].*ones(nxC*nyC,1);
-          zeros(3*nxC*nyC,3)];
-Bd_COM(COM.coord_ctrl,:) = 0;
-Bd_SOM = [[1 0 0].*ones(nxS*nyS,1);
+          [0 0 1].*ones(nxC*nyC,1)];
+Bd_COM(3*nxC*nyC+COM.coord_ctrl,:) = 0;
+Bd_SOM = [zeros(3*nxS*nyS,3);
+          [1 0 0].*ones(nxS*nyS,1);
           [0 1 0].*ones(nxS*nyS,1);
-          [0 0 1].*ones(nxS*nyS,1);
-          zeros(3*nxS*nyS,3)];
-Bd_SOM(SOM.coord_ctrl,:) = 0;
+          [0 0 1].*ones(nxS*nyS,1)];
+Bd_SOM(3*nxS*nyS+SOM.coord_ctrl,:) = 0;
 
 
 %% Start casADi optimization problem
@@ -296,7 +296,7 @@ for tk=2:nPtRef
     in_params(2,1:6) = u_rot1';
     in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
     in_params(2+[2,4,6],1:Hp+1) = Ref_r_Hp_rot';
-    in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD^2,[3,Hp]); % d_hat
+    in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD,[3,Hp]); % d_hat
     
     % Initial guess for optimizer (u: increments, guess UC=LC=Ref)
     args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
@@ -321,7 +321,7 @@ for tk=2:nPtRef
     u_bef = u_SOM;
     
     % Add disturbance to SOM positions
-    x_dist = Bd_SOM*normrnd(0,sigmaD^2,[3,1]);
+    x_dist = Bd_SOM*normrnd(0,sigmaD,[3,1]);
     
     % Linear SOM uses local variables too (rot)  
     pos_ini_SOM = reshape(store_state(1:3*nxS*nyS,tk-1), [nxS*nyS,3]);
@@ -336,12 +336,12 @@ for tk=2:nPtRef
     
     % Convert back to global axis
     pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nxS*nyS), [nxS*nyS,3]);
-    vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nxS*nyS):6*nxS*nyS), [nxS*nyS,3]); 
+    vel_nxt_SOM_rot = reshape(next_state_SOM(1+3*nxS*nyS:6*nxS*nyS), [nxS*nyS,3]); 
     pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nxS*nyS,1]);
     vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
     
     % Add sensor noise to positions
-    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
+    pos_noise = normrnd(0,sigmaN,[3*nxS*nyS,1]);
     pos_noisy = pos_nxt_SOM + pos_noise*(tk>10);
         
     % Get COM states from SOM (Close the loop)
