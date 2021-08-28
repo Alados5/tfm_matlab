@@ -1,8 +1,7 @@
 %{
-Closed-loop simulation of an MPC applied to a cloth model
-Original linear model by David Parent
-Modified by Adria Luque so both COM and SOM are linear models,
-as a first step to adapt the code into C++ to apply it to the real robot
+Closed-loop simulation of an MPC applied to a linear cloth model
+- Original linear model by David Parent, modified by Adrià Luque
+- MPC and simulation by Adrià Luque
 %}
 clear; close all; clc;
 
@@ -10,12 +9,10 @@ addpath('..\required_files\cloth_model_New_L\')
 addpath('..\required_files\casadi-toolbox')
 import casadi.*
 
-plotAnim = 0;
-animwWAM = 0;
 
 % General Parameters
 NTraj = 6;
-Ts = 0.020;
+Ts = 0.02;
 Hp = 25;
 nSOM = 4;
 nCOM = 4;
@@ -24,15 +21,19 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 ubound = 50*1e-3;
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.10;
+W_Q = 0.01;
 W_R = 1.00;
 opt_du  = 1;
 opt_Qa  = 0;
 opt_sto = 1;
 
 % Noise parameters
-sigmaD = opt_sto*0.020; %0.020;
-sigmaN = opt_sto*0.050; %0.050;
+sigmaD = 0.050; %0.050;
+sigmaN = 0.050; %0.050;
+
+% Plotting options
+plotAnim = 0;
+animwWAM = 0;
 % ---------------------
 
 
@@ -135,6 +136,17 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 [A_SOM, B_SOM, f_SOM] = create_model_linear_matrices(SOM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
+Bd_COM = [[1 0 0].*ones(nxC*nyC,1);
+          [0 1 0].*ones(nxC*nyC,1);
+          [0 0 1].*ones(nxC*nyC,1);
+          zeros(3*nxC*nyC,3)];
+Bd_COM(COM.coord_ctrl,:) = 0;
+Bd_SOM = [[1 0 0].*ones(nxS*nyS,1);
+          [0 1 0].*ones(nxS*nyS,1);
+          [0 0 1].*ones(nxS*nyS,1);
+          zeros(3*nxS*nyS,3)];
+Bd_SOM(SOM.coord_ctrl,:) = 0;
+
 
 %% Start casADi optimization problem
 
@@ -145,13 +157,14 @@ u = SX.sym('u',6,Hp);
 n_states = size(x,1); % 3*2*nxC*nyC
 
 % Initial parameters of the optimization problem
-P  = SX.sym('P', 2+6, max(n_states, Hp+1)); 
+P  = SX.sym('P', 2+6+3, max(n_states, Hp+1)); 
 x0 = P(1, :)';
 u0 = P(2, 1:6)';
 Rp = P(2+(1:6), 1:Hp+1);
+d_hat = P(2+6+(1:3), 1:Hp);
 
 x(:,1) = x0;
-delta_u = [u(:,1) - 0*u0, diff(u,1,2)];
+delta_u = [u(:,1) - u0, diff(u,1,2)];
 
 % Optimization variables
 w = u(:);
@@ -176,11 +189,10 @@ else
     Q = diag(lc_dist);
 end
 
-
 for k = 1:Hp
     
     % Model Dynamics Constraint -> Definition
-    x(:,k+1) = (A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM);
+    x(:,k+1) = A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM + opt_sto*Bd_COM*d_hat(:,k);
     
     % Constraint: Constant distance between upper corners
     x_ctrl = x(COM.coord_ctrl,k+1);
@@ -245,7 +257,7 @@ Rtcp = [cloth_y cloth_x -cloth_z];
 tcp_ini = (u_SOM([1 3 5])+u_SOM([2 4 6]))'/2 + (Rcloth*TCPOffset_local)';
 
 % Initialize storage
-in_params = zeros(2+6, max(n_states, Hp+1));
+in_params = zeros(2+6+3, max(n_states, Hp+1));
 store_state(:,1) = x_ini_SOM;
 store_noisy(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
@@ -284,6 +296,7 @@ for tk=2:nPtRef
     in_params(2,1:6) = u_rot1';
     in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
     in_params(2+[2,4,6],1:Hp+1) = Ref_r_Hp_rot';
+    in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD^2,[3,Hp]); % d_hat
     
     % Initial guess for optimizer (u: increments, guess UC=LC=Ref)
     args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
@@ -296,7 +309,7 @@ for tk=2:nPtRef
     % Control actions are upper corner displacements (incremental pos)
     % And they are in local base
     u_rot = reshape(full(sol.x),6,Hp)'; 
-    u_rot1 = u_rot(1,1:end)';
+    u_rot1 = u_rot(1,:)';
     u_rot2 = [u_rot1([1 3 5]) u_rot1([2 4 6])];
     
     % Convert back to global base
@@ -308,19 +321,18 @@ for tk=2:nPtRef
     u_bef = u_SOM;
     
     % Add disturbance to SOM positions
-    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
-    x_distd = store_state(:,tk-1) + x_dist*(tk>10);
+    x_dist = Bd_SOM*normrnd(0,sigmaD^2,[3,1]);
     
     % Linear SOM uses local variables too (rot)  
-    pos_ini_SOM = reshape(x_distd(1:3*nxS*nyS), [nxS*nyS,3]);
-    vel_ini_SOM = reshape(x_distd(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
+    pos_ini_SOM = reshape(store_state(1:3*nxS*nyS,tk-1), [nxS*nyS,3]);
+    vel_ini_SOM = reshape(store_state(3*nxS*nyS+1:6*nxS*nyS,tk-1), [nxS*nyS,3]);
     pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
     vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
     x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
                      reshape(vel_ini_SOM_rot,[3*nxS*nyS,1])];
     
     % Simulate a step
-    next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
+    next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM + x_dist;
     
     % Convert back to global axis
     pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nxS*nyS), [nxS*nyS,3]);
@@ -368,8 +380,8 @@ for tk=2:nPtRef
 end
 tT = toc(tT0);
 fprintf(['-----------------------------------------\n', ...
-         ' -- Total time: \t',num2str(tT),' s \n', ...
-         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
+         ' - Total time:  \t',num2str(tT),' s \n', ...
+         ' - Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
 
 
 %% KPI
@@ -400,12 +412,8 @@ KPIs.eMSEm = eMSEm;
 KPIs.eRMSEm = eRMSEm;
 
 % Display them
-fprintf('\nExecution KPIs:\n');
-fprintf(['- Coord. MAE:  \t', num2str(1000*eMAE),'\n']);
-fprintf(['- Coord. RMSE: \t', num2str(1000*eRMSE),'\n']);
-fprintf(['- Mean MAE:  \t', num2str(1000*eMAEm),' mm\n']);
-fprintf(['- Norm MAE:  \t', num2str(1000*eMAEp),' mm\n']);
-fprintf(['- Norm RMSE: \t', num2str(1000*eRMSEp),' mm\n']);
+fprintf([' - Mean MAE:  \t\t', num2str(1000*eMAEm),' mm\n']);
+fprintf([' - Norm RMSE: \t\t', num2str(1000*eRMSEp),' mm\n']);
 
 
 

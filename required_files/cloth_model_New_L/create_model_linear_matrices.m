@@ -65,7 +65,10 @@ for i=1:length(cctrl)
     B(cctrl(i), i) = 1;
 end
 
-% Initial lengths matrices
+% Matrices of initial neighbor distance (pull)
+% Row=node -> If neighbors at same distance in one direction: equilibrium
+%          -> If edge node: pulled by only one neighbor in a direction
+%          -> With z_sum, center nodes can have pull in z
 mx = sum(param.mat_x, 2);
 my = sum(param.mat_y, 2);
 mz = sum(param.mat_z, 2);
@@ -73,10 +76,10 @@ mz = sum(param.mat_z, 2);
 grav = zeros(2*blksz, 1);
 grav(end-nx*ny+1:end) = -g;
 
-l0_molles = [zeros(blksz,1);
+a0_molles = [zeros(blksz,1);
              -k(1)/m * mx; -k(2)/m * my; -k(3)/m * mz];
 
-f_ext = grav + l0_molles;
+f_ext = grav + a0_molles;
 f_ext(cctrl+blksz) = 0;
 
 % Make them sparse to speed up the calculations

@@ -1,8 +1,9 @@
 %{
-Closed-loop simulation of an MPC applied to a cloth model
-Original linear model by David Parent
-Modified by Adria Luque so both COM and SOM are linear models,
-and then added the nonlinear model to simulate reality
+Closed-loop simulation of an MPC applied to cloth models
+- Original linear model by David Parent, modified by Adrià Luque
+- New NL model by Franco Coltraro
+- MPC and simulation by Adrià Luque
+- Both COM and SOM are linear, a third nonlinear model simulates reality
 %}
 clear; close all; clc;
 
@@ -11,8 +12,6 @@ addpath('..\required_files\cloth_model_New_L\')
 addpath('..\required_files\casadi-toolbox')
 import casadi.*
 
-plotAnim = 0;
-animwWAM = 0;
 
 % General Parameters
 NTraj = 6;
@@ -27,15 +26,20 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 ubound = 50*1e-3;
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.50;
+W_Q = 0.05;
 W_R = 1.00;
 opt_du  = 1;
 opt_Qa  = 0;
 opt_sto = 1;
 
 % Noise parameters
-sigmaD = opt_sto*0.020; %0.020;
-sigmaN = opt_sto*0.050; %0.050;
+sigmaD = 0.050; %0.050;
+sigmaN = 0.050; %0.050;
+
+% Plotting options
+plotAnim = 0;
+animwWAM = 0;
+plot_nlm = 0;
 % ---------------------
 
 
@@ -43,6 +47,7 @@ sigmaN = opt_sto*0.050; %0.050;
 Ref_l = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
 Ref_r = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
 nPtRef = size(Ref_l,1);
+time = 0:Ts:nPtRef*Ts-Ts;
 
 % Get implied cloth size, position and angle wrt XZ
 dphi_corners1 = Ref_r(1,:) - Ref_l(1,:);
@@ -132,12 +137,29 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 [A_SOM, B_SOM, f_SOM] = create_model_linear_matrices(SOM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
+Bd_COM = [[1 0 0].*ones(nCOM^2,1);
+          [0 1 0].*ones(nCOM^2,1);
+          [0 0 1].*ones(nCOM^2,1);
+          zeros(3*nCOM^2,3)];
+Bd_COM(COM.coord_ctrl,:) = 0;
+Bd_SOM = [[1 0 0].*ones(nSOM^2,1);
+          [0 1 0].*ones(nSOM^2,1);
+          [0 0 1].*ones(nSOM^2,1);
+          zeros(3*nSOM^2,3)];
+Bd_SOM(SOM.coord_ctrl,:) = 0;
+
 
 % Third model as a real cloth representation (NL)
 [NLM, pos_nl] = initialize_nl_model(lCloth,nNLM,cCloth,aCloth,Ts);
 x_ini_NLM = [reshape(pos_nl,[3*nNLM^2 1]); zeros(3*nNLM^2,1)];
 NL_coord_lc = NLM.coord_lc; 
 n_states_nl = 3*2*nNLM^2;
+
+Bd_NLM = [[1 0 0].*ones(nNLM^2,1);
+          [0 1 0].*ones(nNLM^2,1);
+          [0 0 1].*ones(nNLM^2,1);
+          zeros(3*nNLM^2,3)];
+Bd_NLM(NLM.coord_ctrl,:) = 0;
 
 
 %% Start casADi optimization problem
@@ -149,13 +171,14 @@ u = SX.sym('u',6,Hp);
 n_states = size(x,1); % 3*2*nxC*nyC
 
 % Initial parameters of the optimization problem
-P  = SX.sym('P', 2+6, max(n_states, Hp+1)); 
+P  = SX.sym('P', 2+6+3, max(n_states, Hp+1)); 
 x0 = P(1, :)';
 u0 = P(2, 1:6)';
 Rp = P(2+(1:6), 1:Hp+1);
+d_hat = P(2+6+(1:3), 1:Hp);
 
 x(:,1) = x0;
-delta_u = [u(:,1) - 0*u0, diff(u,1,2)];
+delta_u = [u(:,1) - u0, diff(u,1,2)];
 
 % Optimization variables
 w = u(:);
@@ -184,7 +207,7 @@ end
 for k = 1:Hp
 
     % Model Dynamics Constraint -> Definition
-    x(:,k+1) = (A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM);
+    x(:,k+1) = A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM + opt_sto*Bd_COM*d_hat(:,k);
     
     % Constraint: Constant distance between upper corners
     x_ctrl = x(COM.coord_ctrl,k+1);
@@ -263,7 +286,7 @@ end
 warning('on','MATLAB:nearlySingularMatrix');
 
 % Initialize storage
-in_params = zeros(2+6, max(n_states, Hp+1));
+in_params = zeros(2+6+3, max(n_states, Hp+1));
 store_somstate(:,1) = x_ini_SOM;
 store_nlmstate(:,1) = x_ini_NLM;
 store_nlmnoisy(:,1) = x_ini_NLM;
@@ -273,7 +296,6 @@ store_pose(1) = struct('position', tcp_ini, ...
 
 tT = 0;
 t1 = tic;
-t2 = tic;
 printX = 100;
 for tk=2:nPtRef
     t0 = tic;
@@ -321,6 +343,7 @@ for tk=2:nPtRef
     in_params(2,1:6) = u_rot1';
     in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
     in_params(2+[2,4,6],1:Hp+1) = Ref_r_Hp_rot';
+    in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD^2,[3,Hp]); % d_hat
     
     % Initial guess for optimizer (u: increments, guess UC=LC=Ref)
     args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
@@ -357,8 +380,8 @@ for tk=2:nPtRef
     tT=tT+toc(t0);
     
     % Add disturbance to NLM positions
-    x_dist = [normrnd(0,sigmaD^2,[n_states_nl/2,1]); zeros(n_states_nl/2,1)];
-    x_distd = store_nlmstate(:,tk-1) + x_dist*(tk>10);
+    x_dist = Bd_NLM*normrnd(0,sigmaD^2,[3,1]);
+    x_distd = store_nlmstate(:,tk-1) + x_dist;
     
     % Simulate a NLM step
     [pos_nxt_NLM, vel_nxt_NLM] = simulate_cloth_step(x_distd,u_SOM,NLM); 
@@ -394,20 +417,16 @@ for tk=2:nPtRef
     store_pose(tk) = PoseTCP;
     
     if(mod(tk,printX)==0)
-        t20 = toc(t2)*1000;
         fprintf(['Iter: ', num2str(tk), ...
-            ' \t Avg. time/iter: ', num2str(t20/printX), ' ms \n']);
-        t2 = tic;
+            ' \t Avg. time/iter: ', num2str(tT/tk*1000), ' ms \n']);
     end
 end
 tT = tT + toc(t0);
 tT1 = toc(t1);
 fprintf(['-----------------------------------------\n', ...
-         ' -- Total time: \t',num2str(tT),' s \n', ...
-         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n', ...
-         '[Times without NLM simulation, extra ',num2str(tT1-tT),' s] \n']);
-
-time = 0:Ts:size(store_somstate,2)*Ts-Ts;
+         ' [Times without NLM sim: extra ',num2str(tT1-tT),' s] \n',...
+         ' - Total time:  \t',num2str(tT),' s \n', ...
+         ' - Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms  \n']);
 
 
 %% KPI
@@ -438,12 +457,9 @@ KPIs.eMSEm = eMSEm;
 KPIs.eRMSEm = eRMSEm;
 
 % Display them
-fprintf('\nExecution KPIs:\n');
-fprintf(['- Coord. MAE:  \t', num2str(1000*eMAE),'\n']);
-fprintf(['- Coord. RMSE: \t', num2str(1000*eRMSE),'\n']);
-fprintf(['- Mean MAE:  \t', num2str(1000*eMAEm),' mm\n']);
-fprintf(['- Norm MAE:  \t', num2str(1000*eMAEp),' mm\n']);
-fprintf(['- Norm RMSE: \t', num2str(1000*eRMSEp),' mm\n']);
+%fprintf([' - Coord. RMSE: \t', num2str(1000*eRMSE),'\n']);
+fprintf([' - Mean MAE:  \t\t', num2str(1000*eMAEm),' mm\n']);
+fprintf([' - Norm RMSE: \t\t', num2str(1000*eRMSEp),' mm\n']);
 
 
 
@@ -503,60 +519,62 @@ Lgnd1.Position(2) = 0.06;
 
 
 %% PLOT NLM CORNER EVOLUTION
-fig2 = figure(2);
-fig2.Color = [1,1,1];
-fig2.Units = 'normalized';
-fig2.Position = [0 0 0.5 0.9];
 
 plot_nlevo = store_nlmnoisy;
+if (plot_nlm == 1)
+    fig2 = figure(2);
+    fig2.Color = [1,1,1];
+    fig2.Units = 'normalized';
+    fig2.Position = [0 0 0.5 0.9];
 
-subplot(15,2,1:2:12);
-plot(time, plot_nlevo(NLM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
-title('\textbf{Left upper corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
+    subplot(15,2,1:2:12);
+    plot(time, plot_nlevo(NLM.coord_ctrl([1 3 5]),:)','linewidth',1.5)
+    title('\textbf{Left upper corner}', 'Interpreter', 'latex')
+    grid on
+    xlabel('Time [s]', 'Interpreter', 'latex')
+    ylabel('Position [m]', 'Interpreter', 'latex')
+    xlim([0 time(end)])
+    set(gca, 'TickLabelInterpreter', 'latex');
 
-subplot(15,2,2:2:12);
-plot(time, plot_nlevo(NLM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
-title('\textbf{Right upper corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
+    subplot(15,2,2:2:12);
+    plot(time, plot_nlevo(NLM.coord_ctrl([2 4 6]),:)','linewidth',1.5);
+    title('\textbf{Right upper corner}', 'Interpreter', 'latex')
+    grid on
+    xlabel('Time [s]', 'Interpreter', 'latex')
+    ylabel('Position [m]', 'Interpreter', 'latex')
+    xlim([0 time(end)])
+    set(gca, 'TickLabelInterpreter', 'latex');
 
-subplot(15,2,17:2:28);
-plot(time, plot_nlevo(NL_coord_lc([1 3 5]),:)', 'linewidth',1.5);
-hold on
-plot(time, Ref_l, '--k', 'linewidth',1.2);
-hold off
-title('\textbf{Left lower corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
+    subplot(15,2,17:2:28);
+    plot(time, plot_nlevo(NL_coord_lc([1 3 5]),:)', 'linewidth',1.5);
+    hold on
+    plot(time, Ref_l, '--k', 'linewidth',1.2);
+    hold off
+    title('\textbf{Left lower corner}', 'Interpreter', 'latex')
+    grid on
+    xlabel('Time [s]', 'Interpreter', 'latex')
+    ylabel('Position [m]', 'Interpreter', 'latex')
+    xlim([0 time(end)])
+    set(gca, 'TickLabelInterpreter', 'latex');
 
-subplot(15,2,18:2:28);
-pa2som = plot(time, plot_nlevo(NL_coord_lc([2 4 6]),:)', 'linewidth',1.5);
-hold on
-pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
-hold off
-title('\textbf{Right lower corner}', 'Interpreter', 'latex')
-grid on
-xlabel('Time [s]', 'Interpreter', 'latex')
-ylabel('Position [m]', 'Interpreter', 'latex')
-xlim([0 time(end)])
-set(gca, 'TickLabelInterpreter', 'latex');
+    subplot(15,2,18:2:28);
+    pa2som = plot(time, plot_nlevo(NL_coord_lc([2 4 6]),:)', 'linewidth',1.5);
+    hold on
+    pa1ref = plot(time, Ref_r, '--k', 'linewidth',1.2);
+    hold off
+    title('\textbf{Right lower corner}', 'Interpreter', 'latex')
+    grid on
+    xlabel('Time [s]', 'Interpreter', 'latex')
+    ylabel('Position [m]', 'Interpreter', 'latex')
+    xlim([0 time(end)])
+    set(gca, 'TickLabelInterpreter', 'latex');
 
-Lgnd2 = legend([pa2som' pa1ref(1)], ...
-               '$x_{NLM}$','$y_{NLM}$', '$z_{NLM}$', 'Ref', ...
-               'Orientation','horizontal', 'Interpreter', 'latex');
-Lgnd2.Position(1) = 0.5-Lgnd2.Position(3)/2;
-Lgnd2.Position(2) = 0.06;
+    Lgnd2 = legend([pa2som' pa1ref(1)], ...
+                   '$x_{NLM}$','$y_{NLM}$', '$z_{NLM}$', 'Ref', ...
+                   'Orientation','horizontal', 'Interpreter', 'latex');
+    Lgnd2.Position(1) = 0.5-Lgnd2.Position(3)/2;
+    Lgnd2.Position(2) = 0.06;
+end
 
 
 %% PLOT SOM IN 3D (W/ CLOTH MOVING)
@@ -699,41 +717,43 @@ end
 
 
 %% PLOT NLM IN 3D
-fig4 = figure(4);
-fig4.Color = [1,1,1];
-fig4.Units = 'normalized';
-fig4.Position = [0.5 0 0.5 0.90];
 
-NLM_ctrl = NLM.coord_ctrl(1:2);
-NLM_lowc = NL_coord_lc(1:2);
-store_nlmpos = plot_nlevo(1:3*nNLM^2,:);
-All_uNLM = plot_nlevo(NLM.coord_ctrl,:);
+if (plot_nlm == 1)
+    fig4 = figure(4);
+    fig4.Color = [1,1,1];
+    fig4.Units = 'normalized';
+    fig4.Position = [0.5 0 0.5 0.90];
 
-store_nlmx = store_nlmpos(1:nNLM^2,:);
-store_nlmy = store_nlmpos(nNLM^2+1:2*nNLM^2,:);
-store_nlmz = store_nlmpos(2*nNLM^2+1:3*nNLM^2,:);
+    NLM_ctrl = NLM.coord_ctrl(1:2);
+    NLM_lowc = NL_coord_lc(1:2);
+    store_nlmpos = plot_nlevo(1:3*nNLM^2,:);
+    All_uNLM = plot_nlevo(NLM.coord_ctrl,:);
 
-plot3(All_uNLM(1:2,:)',All_uNLM(3:4,:)',All_uNLM(5:6,:)');
-hold on
-plot3(store_nlmx(NLM_lowc,:)', store_nlmy(NLM_lowc,:)', store_nlmz(NLM_lowc,:)');
+    store_nlmx = store_nlmpos(1:nNLM^2,:);
+    store_nlmy = store_nlmpos(nNLM^2+1:2*nNLM^2,:);
+    store_nlmz = store_nlmpos(2*nNLM^2+1:3*nNLM^2,:);
 
-scatter3(TCP_pos(1,1), TCP_pos(1,2), TCP_pos(1,3), 'om', 'filled');
-plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
-plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
-plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
+    plot3(All_uNLM(1:2,:)',All_uNLM(3:4,:)',All_uNLM(5:6,:)');
+    hold on
+    plot3(store_nlmx(NLM_lowc,:)', store_nlmy(NLM_lowc,:)', store_nlmz(NLM_lowc,:)');
 
-scatter3(store_nlmx(:,1), store_nlmy(:,1), store_nlmz(:,1), '.b');
-hold off
-axis equal; box on; grid on;
-xlim(limx);
-ylim(limy);
-zlim(limz);
-set(gca, 'TickLabelInterpreter','latex');
-xlabel('X', 'Interpreter','latex');
-ylabel('Y', 'Interpreter','latex');
-zlabel('Z', 'Interpreter','latex');
-fig4.Children.View = pov;
+    scatter3(TCP_pos(1,1), TCP_pos(1,2), TCP_pos(1,3), 'om', 'filled');
+    plot3(TCP_pos(:,1), TCP_pos(:,2), TCP_pos(:,3), '--m');
+    plot3(Ref_l(:,1),Ref_l(:,2),Ref_l(:,3), '--k');
+    plot3(Ref_r(:,1),Ref_r(:,2),Ref_r(:,3), '--k');
 
+    scatter3(store_nlmx(:,1), store_nlmy(:,1), store_nlmz(:,1), '.b');
+    hold off
+    axis equal; box on; grid on;
+    xlim(limx);
+    ylim(limy);
+    zlim(limz);
+    set(gca, 'TickLabelInterpreter','latex');
+    xlabel('X', 'Interpreter','latex');
+    ylabel('Y', 'Interpreter','latex');
+    zlabel('Z', 'Interpreter','latex');
+    fig4.Children.View = pov;
+end
 
 
 

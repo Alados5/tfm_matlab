@@ -1,9 +1,8 @@
 %{
-Closed-loop simulation of an MPC applied to a cloth model
-Original linear model by David Parent
-Modified by Adria Luque
-
-New NL model by Franco Coltraro
+Closed-loop simulation of an MPC applied to a nonlinear cloth model
+- Original linear model by David Parent, modified by Adrià Luque
+- New NL model by Franco Coltraro
+- MPC and simulation by Adrià Luque
 %}
 clear; close all; clc;
 
@@ -12,31 +11,34 @@ addpath('..\required_files\cloth_model_New_L\')
 addpath('..\required_files\casadi-toolbox')
 import casadi.*
 
-plotAnim = 0;
-animwWAM = 0;
 
 % General Parameters
-NTraj = 16;
-Ts = 0.01;
-Hp = 30;
+NTraj = 6;
+Ts = 0.02;
+Hp = 25;
 nSOM = 10;
 nCOM = 4;
 zsum0 = 0.003;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
-ubound = 100*1e-3; %5*1e-3
+ubound = 50*1e-3; %5*1e-3
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.05;
+W_Q = 0.01;
 W_R = 1.00;
-opt_du  = 0;
+opt_du  = 1;
 opt_Qa  = 0;
-opt_sto = 0;
+opt_sto = 1;
 
 % Noise parameters
-sigmaD = opt_sto*0.020; %0.020;
-sigmaN = opt_sto*0.004; %0.004;
+sigmaD = 0.050; %0.050;
+sigmaN = 0.050; %0.050;
+
+% Plotting options
+plotAnim = 0;
+animwWAM = 0;
 % ---------------------
+
 
 % Load trajectory to follow
 Ref_l = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
@@ -120,6 +122,17 @@ COM.nodeInitial = lift_z(posCOM_XZ, COM);
 % Find linear matrices
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
+Bd_COM = [[1 0 0].*ones(nxC*nyC,1);
+          [0 1 0].*ones(nxC*nyC,1);
+          [0 0 1].*ones(nxC*nyC,1);
+          zeros(3*nxC*nyC,3)];
+Bd_COM(COM.coord_ctrl,:) = 0;
+Bd_SOM = [[1 0 0].*ones(nxS*nyS,1);
+          [0 1 0].*ones(nxS*nyS,1);
+          [0 0 1].*ones(nxS*nyS,1);
+          zeros(3*nxS*nyS,3)];
+Bd_SOM(SOM.coord_ctrl,:) = 0;
+
 
 %% Start casADi optimization problem
 
@@ -130,13 +143,14 @@ u = SX.sym('u',6,Hp);
 n_states = size(x,1); % 3*2*nxC*nyC
 
 % Initial parameters of the optimization problem
-P  = SX.sym('P', 2+6, max(n_states, Hp+1)); 
+P  = SX.sym('P', 2+6+3, max(n_states, Hp+1)); 
 x0 = P(1, :)';
 u0 = P(2, 1:6)';
 Rp = P(2+(1:6), 1:Hp+1);
+d_hat = P(2+6+(1:3), 1:Hp);
 
 x(:,1) = x0;
-delta_u = [u(:,1) - 0*u0, diff(u,1,2)];
+delta_u = [u(:,1) - u0, diff(u,1,2)];
 
 % Optimization variables
 w = u(:);
@@ -165,7 +179,7 @@ end
 for k = 1:Hp
     
     % Model Dynamics Constraint -> Definition
-    x(:,k+1) = (A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM);
+    x(:,k+1) = A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM + opt_sto*Bd_COM*d_hat(:,k);
     
     % Constraint: Constant distance between upper corners
     x_ctrl = x(COM.coord_ctrl,k+1);
@@ -243,7 +257,7 @@ end
 warning('on','MATLAB:nearlySingularMatrix');
 
 % Initialize storage
-in_params = zeros(2+6, max(n_states, Hp+1));
+in_params = zeros(2+6+3, max(n_states, Hp+1));
 store_state(:,1) = x_ini_SOM;
 store_noisy(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
@@ -252,7 +266,6 @@ store_pose(1) = struct('position', tcp_ini, ...
 
 tT = 0;
 t1 = tic;
-t2 = tic;
 printX = 100;
 for tk=2:nPtRef
     
@@ -283,7 +296,8 @@ for tk=2:nPtRef
     in_params(2,1:6) = u_rot1';
     in_params(2+[1,3,5],1:Hp+1) = Ref_l_Hp_rot';
     in_params(2+[2,4,6],1:Hp+1) = Ref_r_Hp_rot';
-    
+    in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD^2,[3,Hp]); % d_hat
+
     % Initial guess for optimizer (u: increments, guess UC=LC=Ref)
     args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
     
@@ -325,8 +339,8 @@ for tk=2:nPtRef
     PoseTCP.orientation = rotm2quat(Rtcp);
     
     % Add disturbance to SOM positions
-    x_dist = [normrnd(0,sigmaD^2,[3*nSOM^2,1]); zeros(3*nSOM^2,1)];
-    x_distd = store_state(:,tk-1) + x_dist*(tk>10);
+    x_dist = Bd_SOM*normrnd(0,sigmaD^2,[3,1]);
+    x_distd = store_state(:,tk-1) + x_dist;
     
     % Simulate a step of the SOM
     tT=tT+toc(t0);
@@ -348,18 +362,16 @@ for tk=2:nPtRef
     
     % Display progress
     if(mod(tk,printX)==0)
-        t20 = toc(t2)*1000;
         fprintf(['Iter: ', num2str(tk), ...
-            ' \t Avg. time/iter: ', num2str(t20/printX), ' ms \n']);
-        t2 = tic;
+            ' \t Avg. time/iter: ', num2str(tT/tk*1000), ' ms \n']);
     end
 end
 tT = tT + toc(t0);
 tT1 = toc(t1);
 fprintf(['-----------------------------------------\n', ...
-         ' -- Total time: \t',num2str(tT),' s \n', ...
-         ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n', ...
-         '[Times without SOM simulation, extra ',num2str(tT1-tT),' s] \n']);
+         ' [Times without SOM sim: extra ',num2str(tT1-tT),' s] \n',...
+         ' - Total time:  \t',num2str(tT),' s \n', ...
+         ' - Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms  \n']);
 
 
 %% COMPARE MODELS
@@ -418,9 +430,7 @@ for i=2:size(store_state,2)
     All_StC(:,i) = StCOM;
 end
 
-
 % Convert to cm and square to penalize big differences more
-%avg_lin_error = mean(abs(All_StSrd-All_StC),2);
 avg_lin_error = mean((100*(All_StSrd-All_StC)).^2,2);
 avg_lin_error_pos = avg_lin_error(1:3*COMlength);
 
@@ -429,10 +439,9 @@ err_mask = kron([1 1 1]', (floor(nCOM-1/nCOM:-1/nCOM:0)'+1)/nCOM);
 wavg_lin_error_pos = avg_lin_error_pos.*err_mask.^2;
 
 % Final COM vs SOM Reward
-%Rwd = -norm(avg_lin_error_pos, 1);
 Rwd = -norm(wavg_lin_error_pos, 1);
 
-fprintf([' -- Model Reward:\t', num2str(Rwd), '\n']);
+%fprintf([' - Model Reward:\t', num2str(Rwd), '\n']);
 
 
 %% KPI
@@ -463,12 +472,9 @@ KPIs.eMSEm = eMSEm;
 KPIs.eRMSEm = eRMSEm;
 
 % Display them
-fprintf('\nExecution KPIs:\n');
-fprintf(['- Coord. MAE:  \t', num2str(1000*eMAE),'\n']);
-fprintf(['- Coord. RMSE: \t', num2str(1000*eRMSE),'\n']);
-fprintf(['- Mean MAE:  \t', num2str(1000*eMAEm),' mm\n']);
-fprintf(['- Norm MAE:  \t', num2str(1000*eMAEp),' mm\n']);
-fprintf(['- Norm RMSE: \t', num2str(1000*eRMSEp),' mm\n']);
+%fprintf([' - Coord. RMSE: \t', num2str(1000*eRMSE),'\n']);
+fprintf([' - Mean MAE:  \t\t', num2str(1000*eMAEm),' mm\n']);
+fprintf([' - Norm RMSE: \t\t', num2str(1000*eRMSEp),' mm\n']);
 
 
 %% PLOT CORNERS
