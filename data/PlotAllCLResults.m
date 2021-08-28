@@ -3,8 +3,8 @@
 
 clear; clc;
 
-filename = 'somstate_rotproof.mat';
-NTraj = 16;
+filename = 'somstate_smpc.mat';
+NTraj = 6;
 Ts = 0.01;
 
 
@@ -59,9 +59,9 @@ xlim(limx);
 ylim(limy);
 zlim(limz);
 set(gca, 'TickLabelInterpreter','latex');
-xlabel('$x$ [m]', 'Interpreter','latex');
-ylabel('$y$ [m]', 'Interpreter','latex');
-zlabel('$z$ [m]', 'Interpreter','latex');
+xlabel('$X$ [m]', 'Interpreter','latex');
+ylabel('$Y$ [m]', 'Interpreter','latex');
+zlabel('$Z$ [m]', 'Interpreter','latex');
 title('\textbf{3D Evolution of all corners}', 'Interpreter', 'latex')
 
 
@@ -114,7 +114,7 @@ xlim([0 time(end)])
 set(gca, 'TickLabelInterpreter', 'latex');
 
 Lgnd1 = legend([pa1som' pa1ref(1)], ...
-               '$x_{SOM}$','$y_{SOM}$', '$z_{SOM}$', '$r$', ...
+               '$X_{SOM}$','$Y_{SOM}$', '$Z_{SOM}$', '$r$', ...
                'Orientation','horizontal', 'Interpreter', 'latex');
 Lgnd1.Position(1) = 0.75-Lgnd1.Position(3)/2;
 Lgnd1.Position(2) = 0.01;
