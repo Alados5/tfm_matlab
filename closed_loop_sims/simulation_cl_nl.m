@@ -578,9 +578,9 @@ xlim(limx);
 ylim(limy);
 zlim(limz);
 set(gca, 'TickLabelInterpreter','latex');
-xlabel('X', 'Interpreter','latex');
-ylabel('Y', 'Interpreter','latex');
-zlabel('Z', 'Interpreter','latex');
+xlabel('$X$ [m]', 'Interpreter','latex');
+ylabel('$Y$ [m]', 'Interpreter','latex');
+zlabel('$Z$ [m]', 'Interpreter','latex');
 for fch=1:length(fig3.Children)
     if isa(fig3.Children(fch),'matlab.graphics.axis.Axes')
         fig3.Children(fch).View = pov;
@@ -614,9 +614,9 @@ if(plotAnim==1)
         ylim(limy);
         zlim(limz);
         set(gca, 'TickLabelInterpreter','latex');
-        xlabel('X', 'Interpreter','latex');
-        ylabel('Y', 'Interpreter','latex');
-        zlabel('Z', 'Interpreter','latex');
+        xlabel('$X$ [m]', 'Interpreter','latex');
+        ylabel('$Y$ [m]', 'Interpreter','latex');
+        zlabel('$Z$ [m]', 'Interpreter','latex');
 
         if (animwWAM > 0)
             WAMbaseC = [0.8 0.8 0.8];
@@ -661,9 +661,9 @@ if(plotAnim==1)
     ylim(limy);
     zlim(limz);
     set(gca, 'TickLabelInterpreter','latex');
-    xlabel('X', 'Interpreter','latex');
-    ylabel('Y', 'Interpreter','latex');
-    zlabel('Z', 'Interpreter','latex');
+    xlabel('$X$ [m]', 'Interpreter','latex');
+    ylabel('$Y$ [m]', 'Interpreter','latex');
+    zlabel('$Z$ [m]', 'Interpreter','latex');
     for fch=1:length(fig3.Children)
         if isa(fig3.Children(fch),'matlab.graphics.axis.Axes')
             fig3.Children(fch).View = pov;
