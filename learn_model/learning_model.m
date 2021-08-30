@@ -151,10 +151,13 @@ while epoch <= NEpochs
 
         fprintf([' Theta: [',num2str(thetai'.*ThMask',5),']\n']);
         
-        [Rwd, AllSt] = simulation_ol_theta_v3(theta, opts);
-        %[Rwd, AllSt] = simulation_ol_theta_v2(theta, opts);
-        %[Rwd, AllSt] = simulation_ol_theta_v1(theta, opts);
-        %[Rwd, AllSt] = simulation_cl_theta(theta, opts);
+        % To compare against real cloth data
+        [Rwd, AllSt] = sim_ol_theta_realcloth(theta, opts);
+        
+        % To compare against a nonlinear model (old/new)
+        %[Rwd, AllSt] = sim_ol_theta_nlmdl_new(theta, opts);
+        %[Rwd, AllSt] = sim_ol_theta_nlmdl_old(theta, opts);
+        
         Rwd = max(Rwd, minRwd);
 
         wghts_ep(:,i) = thetai;
@@ -180,7 +183,7 @@ while epoch <= NEpochs
         end
         
         Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
-        mw = sum(bsxfun(@times, weights2', dw),1)'./sum(dw);
+        mw = sum(weights2'.*dw)'/sum(dw);
         summ = 0;
         for ak = 1:size(weights2,2)
             summ = summ + dw(ak)*((weights2(:,ak)-mw)*(weights2(:,ak)-mw)');%/sum(dw);

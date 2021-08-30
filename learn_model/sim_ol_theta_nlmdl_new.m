@@ -1,4 +1,4 @@
-function [Rwd, AllSt] = simulation_ol_theta_v2(theta, opts)
+function [Rwd, AllSt] = sim_ol_theta_nlmdl_new(theta, opts)
 
 addpath('..\required_files\cloth_model_New_NL')
 addpath('..\required_files\cloth_model_New_L')

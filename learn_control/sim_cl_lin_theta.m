@@ -1,6 +1,5 @@
-function [Rwd, AllData] = simulation_cl_nl_theta(theta, opts)
+function [Rwd, AllData] = sim_cl_lin_theta(theta, opts)
 
-addpath('..\required_files\cloth_model_New_NL\')
 addpath('..\required_files\cloth_model_New_L\')
 addpath('..\required_files\casadi-toolbox')
 import casadi.*
@@ -14,6 +13,7 @@ if nargin < 2
     sigmaN = 0;
     nCOM = 4;
     nSOM = 4;
+    paramsSOM = [-300 -10 -225  -4 -2.5 -4 0.03];
     paramsCOM = [-300 -10 -225  -4 -2.5 -4 0.03];
     ubound = 50e-3;
     gbound = 0;
@@ -28,6 +28,7 @@ else
     sigmaN    = opts.sigmaN;
     nCOM      = opts.nCOM;
     nSOM      = opts.nSOM;
+    paramsSOM = opts.paramsSOM;
     paramsCOM = opts.paramsCOM;  
     ubound    = opts.ubound;
     gbound    = opts.gbound;
@@ -73,11 +74,27 @@ C_coord_lc = [1 nyC 1+nxC*nyC nxC*nyC+nyC 2*nxC*nyC+1 2*nxC*nyC+nyC];
 COM.coord_lc = C_coord_lc;
 
               
-% Define the SOM (NONLINEAR)
+% Define the SOM (LINEAR)
 nxS = nSOM;
 nyS = nSOM;
-[SOM, pos] = initialize_nl_model(lCloth,nSOM,cCloth,aCloth,Ts);
-S_coord_lc = SOM.coord_lc;
+SOM = struct;
+SOM.row = nxS;
+SOM.col = nyS;
+SOM.mass = 0.1;
+SOM.grav = 9.8;
+SOM.dt = Ts;
+SOM.stiffness = paramsSOM(1:3);
+SOM.damping = paramsSOM(4:6);
+SOM.z_sum = paramsSOM(7);
+
+% Important Coordinates (upper and lower corners in x,y,z)
+SOM_nd_ctrl = [nxS*(nyS-1)+1, nxS*nyS];
+SOM.coord_ctrl = [SOM_nd_ctrl SOM_nd_ctrl+nxS*nyS SOM_nd_ctrl+2*nxS*nyS];
+S_coord_lc = [1 nxS 1+nxS*nyS nxS*nyS+nxS 2*nxS*nyS+1 2*nxS*nyS+nxS];
+SOM.coord_lc = S_coord_lc;
+
+% Real initial position in space
+pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
 
 
 % Define initial position of the nodes (needed for ext_force)
@@ -88,18 +105,22 @@ x_ini_SOM = [reshape(pos,[3*nxS*nyS 1]); zeros(3*nxS*nyS,1)];
 [reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
 x_ini_COM = [reduced_pos; zeros(3*nxC*nyC,1)];
 
-% Rotate initial COM position to XZ plane
+% Rotate initial COM and SOM positions to XZ plane
 RCloth_ini = [cos(aCloth) -sin(aCloth) 0; sin(aCloth) cos(aCloth) 0; 0 0 1];
+posSOM_XZ = (RCloth_ini^-1 * pos')';
 posCOM = reshape(x_ini_COM(1:3*nxC*nyC), [nxC*nyC,3]);
 posCOM_XZ = (RCloth_ini^-1 * posCOM')';
 
 % Initial position of the nodes
+SOM.nodeInitial = lift_z(posSOM_XZ, SOM);
 COM.nodeInitial = lift_z(posCOM_XZ, COM);
 
 % Find initial spring length in each direction x,y,z
+[SOM.mat_x, SOM.mat_y, SOM.mat_z] = compute_l0_linear(SOM,0);
 [COM.mat_x, COM.mat_y, COM.mat_z] = compute_l0_linear(COM,0);
 
 % Find linear matrices
+[A_SOM, B_SOM, f_SOM] = create_model_linear_matrices(SOM);
 [A_COM, B_COM, f_COM] = create_model_linear_matrices(COM);
 
 
@@ -145,7 +166,6 @@ end
 
 
 for k = 1:Hp
-    
     % Model Dynamics Constraint -> Definition
     x(:,k+1) = (A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM);
     
@@ -155,7 +175,6 @@ for k = 1:Hp
     lbg = [lbg; -gbound];
     ubg = [ubg;  gbound];
     
-
     % Objective function
     x_err = x(COM.coord_lc,k+1) - Rp(:,k+1);
     objfun = objfun + x_err'*W_Q*Q*x_err;
@@ -165,6 +184,7 @@ for k = 1:Hp
         objfun = objfun + delta_u(:,k)'*W_R*delta_u(:,k);
     end
 end
+
 
 opt_prob = struct('f', objfun, 'x', w, 'g', g, 'p', P);
 opt_config = struct;
@@ -186,7 +206,7 @@ u_rot1 = u_lin;
 u_bef  = u_ini;
 u_SOM  = u_ini;
 
-% Get initial Cloth orientation (rotation matrix)
+% Get Cloth orientation (rotation matrix)
 cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
 cloth_y = [-cloth_x(2) cloth_x(1) 0]';
 cloth_z = cross(cloth_x,cloth_y);
@@ -196,20 +216,7 @@ cloth_y = cloth_y/norm(cloth_y);
 cloth_z = cloth_z/norm(cloth_z);
 Rcloth = [cloth_x cloth_y cloth_z];
 
-% Simulate some SOM steps to stabilize the NL model
-warning('off','MATLAB:nearlySingularMatrix');
-lastwarn('','');
-[p_ini_SOM, ~] = simulate_cloth_step(x_ini_SOM,u_SOM,SOM);
-[~, warnID] = lastwarn;
-while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
-    lastwarn('','');
-    x_ini_SOM = [p_ini_SOM; zeros(3*nxS*nyS,1)];
-    [p_ini_SOM, ~] = simulate_cloth_step(x_ini_SOM,u_SOM,SOM);
-    [~, warnID] = lastwarn;
-end
-warning('on','MATLAB:nearlySingularMatrix');
-
-% Initialize storage
+% Initialize things
 in_params = zeros(2+6, max(n_states, Hp+1));
 store_state(:,1) = x_ini_SOM;
 store_noisy(:,1) = x_ini_SOM;
@@ -221,7 +228,7 @@ printX = floor(nPtRef/5);
 for tk=2:nPtRef
     
     % The last Hp timesteps, trajectory should remain constant
-    if tk>=nPtRef-(Hp+1)
+    if tk>=nPtRef-(Hp+1) 
         Ref_l_Hp = repmat(Ref_l(end,:), Hp+1,1);
         Ref_r_Hp = repmat(Ref_r(end,:), Hp+1,1);
     else
@@ -266,9 +273,38 @@ for tk=2:nPtRef
     u_lin2 = Rcloth * u_rot2;
     u_lin = reshape(u_lin2',[6,1]);
     
-    % Add previous position for absolute position
-    u_SOM = u_lin + u_bef;
+    % Output for Cartesian Ctrl is still u_SOM
+    u_SOM = u_lin+u_bef;
     u_bef = u_SOM;
+    
+    % Add disturbance to SOM positions
+    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
+    x_distd = store_state(:,tk-1) + x_dist*(tk>10);
+    
+    % Linear SOM uses local variables too (rot)
+    pos_ini_SOM = reshape(x_distd(1:3*nxS*nyS), [nxS*nyS,3]);
+    vel_ini_SOM = reshape(x_distd(3*nxS*nyS+1:6*nxS*nyS), [nxS*nyS,3]);
+    pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
+    vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
+    x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
+                     reshape(vel_ini_SOM_rot,[3*nxS*nyS,1])];
+    
+    % Simulate a step
+    next_state_SOM = A_SOM*x_ini_SOM_rot + B_SOM*u_rot1 + SOM.dt*f_SOM;
+    
+    % Convert back to global axis
+    pos_nxt_SOM_rot = reshape(next_state_SOM(1:3*nxS*nyS), [nxS*nyS,3]);
+    vel_nxt_SOM_rot = reshape(next_state_SOM((1+3*nxS*nyS):6*nxS*nyS), [nxS*nyS,3]); 
+    pos_nxt_SOM = reshape((Rcloth * pos_nxt_SOM_rot')', [3*nxS*nyS,1]);
+    vel_nxt_SOM = reshape((Rcloth * vel_nxt_SOM_rot')', [3*nxS*nyS,1]);
+    
+    % Add sensor noise to positions
+    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
+    pos_noisy = pos_nxt_SOM + pos_noise*(tk>10);
+        
+    % Get COM states from SOM (Close the loop)
+    [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);
+    x_ini_COM = [phired; dphired];
     
     % Get new Cloth orientation (rotation matrix)
     cloth_x = u_SOM([2 4 6]) - u_SOM([1 3 5]);
@@ -280,30 +316,14 @@ for tk=2:nPtRef
     cloth_z = cloth_z/norm(cloth_z);
     Rcloth = [cloth_x cloth_y cloth_z];
     
-    % Add disturbance to SOM positions
-    x_dist = [normrnd(0,sigmaD^2,[n_states/2,1]); zeros(n_states/2,1)];
-    x_distd = store_state(:,tk-1) + x_dist*(tk>10);
-    
-    % Simulate a step of the SOM
-    [pos_nxt_SOM, vel_nxt_SOM] = simulate_cloth_step(x_distd,u_SOM,SOM); 
-    
-    % Add sensor noise to positions
-    pos_noise = normrnd(0,sigmaN^2,[n_states/2,1]);
-    pos_noisy = pos_nxt_SOM + pos_noise*(tk>10);
-    
-    % Get COM states from SOM (Close the loop)
-    [phired, dphired] = take_reduced_mesh(pos_noisy,vel_nxt_SOM, nSOM, nCOM);
-    x_ini_COM = [phired; dphired];
-    
     % Store things
     store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
     store_noisy(:,tk) = [pos_noisy; vel_nxt_SOM];
     store_u(:,tk) = u_lin;
     
-    % Display progress
     if(mod(tk,printX)==0)
         t10 = toc(t0)*1000;
-        fprintf(['Iter: ', num2str(tk), ...
+        fprintf([' - Iter: ', num2str(tk), ...
             ' \t Avg. time/iter: ', num2str(t10/printX), ' ms \n']);
         t0 = tic;
     end
@@ -312,7 +332,7 @@ tT = toc(tT0);
 fprintf([' -- Total time: \t',num2str(tT),' s \n', ...
          ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
 
-
+     
 %% KPI and Reward
 error_l = 1000*(store_state(S_coord_lc([1,3,5]),:)'-Ref_l);
 error_r = 1000*(store_state(S_coord_lc([2,4,6]),:)'-Ref_r);

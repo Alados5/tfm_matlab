@@ -189,11 +189,11 @@ while epoch <= NEpochs
         fprintf([' Theta: [',num2str(thetai',5),']\n']);
         
         if SimTypeN==2
-            [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts);
+            [Rwd, AllData] = sim_cl_rtm_theta(theta, opts);
         elseif SimTypeN==1
-            [Rwd, AllData] = simulation_cl_nl_theta(theta, opts);
+            [Rwd, AllData] = sim_cl_nl_theta(theta, opts);
         else
-            [Rwd, AllData] = simulation_cl_lin_theta(theta, opts);
+            [Rwd, AllData] = sim_cl_lin_theta(theta, opts);
         end
         Rwd = max(Rwd, minRwd);
 
@@ -220,7 +220,7 @@ while epoch <= NEpochs
         end
         
         Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
-        mw = sum(bsxfun(@times, weights2', dw),1)'./sum(dw);
+        mw = sum(weights2'.*dw)'/sum(dw);
         mw(ThW) = mw(ThW)/max(mw(ThW));
         summ = 0;
         for ak = 1:size(weights2,2)
