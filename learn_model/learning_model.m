@@ -362,57 +362,59 @@ end
 
 
 %% Update LUT for Parameters
-ThetaLUT = readtable('ThetaModelLUT.csv');
-LUT_Exp_id = (categorical(ThetaLUT.ExpSetName) == ExpSet) & ...
-             (ThetaLUT.NExp == NExp) & (ThetaLUT.NTrial == NTrial) & ...
-             (ThetaLUT.Ts == Ts) & (ThetaLUT.NEpochs == NEpochs) & ...
-             (ThetaLUT.NSamples == NSamples) & (ThetaLUT.MinRwd == minRwd) & ...
-             (categorical(ThetaLUT.Simulation) == SimType);
-LUT_Exp = ThetaLUT(LUT_Exp_id, :);
+DataTable = readtable('LearntMdl_Data.csv');
+Tbl_Exp_id = (categorical(DataTable.ExpSetName) == ExpSet) & ...
+             (DataTable.NExp == NExp) & (DataTable.NTrial == NTrial) & ...
+             (DataTable.Ts == Ts) & (DataTable.NEpochs == NEpochs) & ...
+             (DataTable.NSamples == NSamples) & (DataTable.MinRwd == minRwd) & ...
+             (categorical(DataTable.Simulation) == SimType);
+Tbl_Exp = DataTable(Tbl_Exp_id, :);
 
-if (size(LUT_Exp,1) > 1)
+if (size(Tbl_Exp,1) > 1)
     error("There are multiple rows with same experiment parameters.");
-elseif (size(LUT_Exp,1) == 1)
+elseif (size(Tbl_Exp,1) == 1)
     % Update experiment row
-    LUT_row = find(LUT_Exp_id);
-    ThetaLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
-    ThetaLUT(LUT_row,'Th_stiffness_x') = {ThLearnt(1)};
-    ThetaLUT(LUT_row,'Th_stiffness_y') = {ThLearnt(2)};
-    ThetaLUT(LUT_row,'Th_stiffness_z') = {ThLearnt(3)};
-    ThetaLUT(LUT_row,'Th_damping_x') = {ThLearnt(4)};
-    ThetaLUT(LUT_row,'Th_damping_y') = {ThLearnt(5)};
-    ThetaLUT(LUT_row,'Th_damping_z') = {ThLearnt(6)};
-    ThetaLUT(LUT_row,'Th_z_sum') = {ThLearnt(7)};
+    Tbl_row = find(Tbl_Exp_id);
+    DataTable(Tbl_row,'LastEpoch') = {e0+NEpochs};
+    DataTable(Tbl_row,'Th_stiffness_x') = {ThLearnt(1)};
+    DataTable(Tbl_row,'Th_stiffness_y') = {ThLearnt(2)};
+    DataTable(Tbl_row,'Th_stiffness_z') = {ThLearnt(3)};
+    DataTable(Tbl_row,'Th_damping_x') = {ThLearnt(4)};
+    DataTable(Tbl_row,'Th_damping_y') = {ThLearnt(5)};
+    DataTable(Tbl_row,'Th_damping_z') = {ThLearnt(6)};
+    DataTable(Tbl_row,'Th_z_sum') = {ThLearnt(7)};
+    DataTable(Tbl_row,'Rwd') = {RWMW(end)};
 else
     % Add experiment row
-    LUT_row = size(ThetaLUT,1)+1;
-    ThetaLUT(LUT_row,'ExpSetN') = {ExpSetN};
-    ThetaLUT(LUT_row,'ExpSetName') = {ExpSet};
-    ThetaLUT(LUT_row,'ExpDate') = {ExpDate};
-    ThetaLUT(LUT_row,'NExp') = {NExp};
-    ThetaLUT(LUT_row,'NTrial') = {NTrial};
-    ThetaLUT(LUT_row,'Ts') = {Ts};
-    ThetaLUT(LUT_row,'nSOM') = {SizeSOM};
-    ThetaLUT(LUT_row,'nCOM') = {SizeCOM};
-    ThetaLUT(LUT_row,'LastEpoch') = {e0+NEpochs};
-    ThetaLUT(LUT_row,'NEpochs') = {NEpochs};
-    ThetaLUT(LUT_row,'NSamples') = {NSamples};
-    ThetaLUT(LUT_row,'Simulation') = {SimType};
-    ThetaLUT(LUT_row,'MinRwd') = {minRwd};
+    Tbl_row = size(DataTable,1)+1;
+    DataTable(Tbl_row,'ExpSetN') = {ExpSetN};
+    DataTable(Tbl_row,'ExpSetName') = {ExpSet};
+    DataTable(Tbl_row,'ExpDate') = {ExpDate};
+    DataTable(Tbl_row,'NExp') = {NExp};
+    DataTable(Tbl_row,'NTrial') = {NTrial};
+    DataTable(Tbl_row,'Ts') = {Ts};
+    DataTable(Tbl_row,'nSOM') = {SizeSOM};
+    DataTable(Tbl_row,'nCOM') = {SizeCOM};
+    DataTable(Tbl_row,'LastEpoch') = {e0+NEpochs};
+    DataTable(Tbl_row,'NEpochs') = {NEpochs};
+    DataTable(Tbl_row,'NSamples') = {NSamples};
+    DataTable(Tbl_row,'Simulation') = {SimType};
+    DataTable(Tbl_row,'MinRwd') = {minRwd};
     
-    ThetaLUT(LUT_row,'Th_stiffness_x') = {ThLearnt(1)};
-    ThetaLUT(LUT_row,'Th_stiffness_y') = {ThLearnt(2)};
-    ThetaLUT(LUT_row,'Th_stiffness_z') = {ThLearnt(3)};
-    ThetaLUT(LUT_row,'Th_damping_x') = {ThLearnt(4)};
-    ThetaLUT(LUT_row,'Th_damping_y') = {ThLearnt(5)};
-    ThetaLUT(LUT_row,'Th_damping_z') = {ThLearnt(6)};
-    ThetaLUT(LUT_row,'Th_z_sum') = {ThLearnt(7)};
+    DataTable(Tbl_row,'Th_stiffness_x') = {ThLearnt(1)};
+    DataTable(Tbl_row,'Th_stiffness_y') = {ThLearnt(2)};
+    DataTable(Tbl_row,'Th_stiffness_z') = {ThLearnt(3)};
+    DataTable(Tbl_row,'Th_damping_x') = {ThLearnt(4)};
+    DataTable(Tbl_row,'Th_damping_y') = {ThLearnt(5)};
+    DataTable(Tbl_row,'Th_damping_z') = {ThLearnt(6)};
+    DataTable(Tbl_row,'Th_z_sum') = {ThLearnt(7)};
+    DataTable(Tbl_row,'Rwd') = {RWMW(end)};
 end
-ThetaLUTcpp = ThetaLUT(:,{'ExpSetN','NExp','NTrial','Ts','nSOM','nCOM', ...
+DataTableCpp = DataTable(:,{'ExpSetN','NExp','NTrial','Ts','nSOM','nCOM', ...
                           'Th_stiffness_x','Th_stiffness_y','Th_stiffness_z', ...
                           'Th_damping_x','Th_damping_y','Th_damping_z', ...
                           'Th_z_sum'});
-writetable(ThetaLUT,'ThetaModelLUT.csv');
-writematrix(table2array(ThetaLUTcpp),'ThetaLUTcpp.csv');
-fprintf('Updated ThetaModelLUT.csv and ThetaLUTcpp.csv\n');
+writetable(DataTable,'LearntMdl_Data.csv');
+writematrix(table2array(DataTableCpp),'LearntMdl_Dcpp.csv');
+fprintf('Updated LearntMdl_Data.csv and LearntMdl_Dcpp.csv\n');
 

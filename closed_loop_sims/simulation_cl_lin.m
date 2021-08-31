@@ -50,7 +50,7 @@ aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
 
 % Load parameter table and select corresponding row(s)
-ThetaLUT = readtable('../learn_model/LearntModelParams.csv');
+ThetaLUT = readtable('../learn_model/ThetaMdl_LUT.csv');
 LUT_SOM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nSOM);
 LUT_COM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nCOM);
 LUT_COM = ThetaLUT(LUT_COM_id, :);

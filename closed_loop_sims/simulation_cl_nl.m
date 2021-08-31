@@ -13,26 +13,26 @@ import casadi.*
 
 
 % General Parameters
-NTraj = 6;
-Ts = 0.01;
-Hp = 15;
-nSOM = 10;
-nCOM = 4;
-zsum0 = 0.003;
+NTraj = 10;
+Ts = 0.02;
+Hp = 25;
+nSOM = 7;
+nCOM = 7;
+zsum0 = 0.013;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
 ubound = 50*1e-3; %5*1e-3
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.01;
+W_Q = 0.001;
 W_R = 1.00;
 opt_du  = 1;
 opt_Qa  = 0;
-opt_sto = 1;
+opt_sto = 0;
 
 % Noise parameters
-sigmaD = 0.003; % m/s
-sigmaN = 0.001; % m
+sigmaD = 0*0.003; % m/s
+sigmaN = 0*0.001; % m
 
 % Plotting options
 plotAnim = 0;
@@ -53,7 +53,7 @@ aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
 
 % Load parameter table and select corresponding row(s)
-ThetaLUT = readtable('../learn_model/LearntModelParams.csv');
+ThetaLUT = readtable('../learn_model/ThetaMdl_LUT.csv');
 LUT_COM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nCOM);
 LUT_Exp = ThetaLUT(LUT_COM_id, :);
 if (size(LUT_Exp,1) > 1)
@@ -255,6 +255,8 @@ while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
     [~, warnID] = lastwarn;
 end
 warning('on','MATLAB:nearlySingularMatrix');
+[reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
+x_ini_COM = [reduced_pos; zeros(3*nxC*nyC,1)];
 
 % Initialize storage
 in_params = zeros(2+6+3, max(n_states, Hp+1));
@@ -416,6 +418,14 @@ for i=2:size(store_state,2)
     ulini2 = [ulini([1 3 5]) ulini([2 4 6])];
     urot2 = (Rcloth^-1 * ulini2);
     uroti = reshape(urot2', [6,1]);
+    
+    %{x
+    if(i==2)
+        for ii=1:round(3/Ts)
+            StCOM_rot = A_COM*StCOM_rot + B_COM*0 + Ts*f_COM;
+        end
+    end
+    %}
     
     StCOM_rot = A_COM*StCOM_rot + B_COM*uroti + Ts*f_COM;
     

@@ -32,7 +32,7 @@ Plot2DTraj = (e0==0);
 
 
 % Load parameter table and select corresponding row
-ThetaModelLUT = readtable('../learn_model/LearntModelParams.csv');
+ThetaModelLUT = readtable('../learn_model/ThetaMdl_LUT.csv');
 LUT_SOM_id = (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.MdlSz == nSOM);
 LUT_COM_id = (ThetaModelLUT.Ts == Ts) & (ThetaModelLUT.MdlSz == nCOM);
 LUT_SOM = ThetaModelLUT(LUT_COM_id, :);
@@ -443,63 +443,63 @@ hold off
 
 
 %% Update LUT for Parameters
-ThetaCtrlLUT = readtable('ThetaControlLUT.csv');
-LUT_Exp_id = (ThetaCtrlLUT.Exps == ExpSet) & ...
-             (ThetaCtrlLUT.Sim == SimTypeN) & ...
-             (ThetaCtrlLUT.NTraj == NTraj) & ...
-             (ThetaCtrlLUT.Ts == Ts) & (ThetaCtrlLUT.Hp == Hp) & ...
-             (ThetaCtrlLUT.nSOM == nSOM) & (ThetaCtrlLUT.nCOM == nCOM) & ...
-             (ThetaCtrlLUT.Wv == Wv) & (ThetaCtrlLUT.nNLM == nNLM) & ...
-             (ThetaCtrlLUT.mRw == minRwd) & ...
-             (ThetaCtrlLUT.sD == sigmaD) & (ThetaCtrlLUT.sN == sigmaN) & ...
-             (ThetaCtrlLUT.Du == opt_Du) & (ThetaCtrlLUT.Qa == opt_Qa) & ...
-             (ThetaCtrlLUT.fRw == opt_Rwd) & (ThetaCtrlLUT.Wgh == opt_Wgh);
-LUT_Exp = ThetaCtrlLUT(LUT_Exp_id, :);
+DataTable = readtable('LearntCtrl_Data.csv');
+Tbl_Exp_id = (DataTable.Exps == ExpSet) & ...
+             (DataTable.Sim == SimTypeN) & ...
+             (DataTable.NTraj == NTraj) & ...
+             (DataTable.Ts == Ts) & (DataTable.Hp == Hp) & ...
+             (DataTable.nSOM == nSOM) & (DataTable.nCOM == nCOM) & ...
+             (DataTable.Wv == Wv) & (DataTable.nNLM == nNLM) & ...
+             (DataTable.mRw == minRwd) & ...
+             (DataTable.sD == sigmaD) & (DataTable.sN == sigmaN) & ...
+             (DataTable.Du == opt_Du) & (DataTable.Qa == opt_Qa) & ...
+             (DataTable.fRw == opt_Rwd) & (DataTable.Wgh == opt_Wgh);
+Tbl_Exp = DataTable(Tbl_Exp_id, :);
 
-if (size(LUT_Exp,1) > 1)
+if (size(Tbl_Exp,1) > 1)
     error("There are multiple rows with same experiment parameters.");
-elseif (size(LUT_Exp,1) == 1)
+elseif (size(Tbl_Exp,1) == 1)
     % Update experiment row
-    LUT_row = find(LUT_Exp_id);
-    ThetaCtrlLUT(LUT_row,'nEps') = {e0+NEpochs};
-    ThetaCtrlLUT(LUT_row,'Qx')   = {ThLearnt6(1)};
-    ThetaCtrlLUT(LUT_row,'Qy')   = {ThLearnt6(2)};
-    ThetaCtrlLUT(LUT_row,'Qz')   = {ThLearnt6(3)};
-    ThetaCtrlLUT(LUT_row,'Rx')   = {ThLearnt6(4)};
-    ThetaCtrlLUT(LUT_row,'Ry')   = {ThLearnt6(5)};
-    ThetaCtrlLUT(LUT_row,'Rz')   = {ThLearnt6(6)};
-    ThetaCtrlLUT(LUT_row,'RMSE') = {ResLearnt(1)};
-    ThetaCtrlLUT(LUT_row,'TOV')  = {ResLearnt(2)};
+    Tbl_row = find(Tbl_Exp_id);
+    DataTable(Tbl_row,'nEps') = {e0+NEpochs};
+    DataTable(Tbl_row,'Qx')   = {ThLearnt6(1)};
+    DataTable(Tbl_row,'Qy')   = {ThLearnt6(2)};
+    DataTable(Tbl_row,'Qz')   = {ThLearnt6(3)};
+    DataTable(Tbl_row,'Rx')   = {ThLearnt6(4)};
+    DataTable(Tbl_row,'Ry')   = {ThLearnt6(5)};
+    DataTable(Tbl_row,'Rz')   = {ThLearnt6(6)};
+    DataTable(Tbl_row,'RMSE') = {ResLearnt(1)};
+    DataTable(Tbl_row,'TOV')  = {ResLearnt(2)};
 else
     % Add experiment row
-    LUT_row = size(ThetaCtrlLUT,1)+1;
-    ThetaCtrlLUT(LUT_row,'Exps')  = {ExpSet};
-    ThetaCtrlLUT(LUT_row,'Sim')   = {SimTypeN};
-    ThetaCtrlLUT(LUT_row,'NTraj') = {NTraj};
-    ThetaCtrlLUT(LUT_row,'Ts')    = {Ts};
-    ThetaCtrlLUT(LUT_row,'Hp')    = {Hp};
-    ThetaCtrlLUT(LUT_row,'Wv')    = {Wv};
-    ThetaCtrlLUT(LUT_row,'nSOM')  = {nSOM};
-    ThetaCtrlLUT(LUT_row,'nCOM')  = {nCOM};
-    ThetaCtrlLUT(LUT_row,'nNLM')  = {nNLM};
-    ThetaCtrlLUT(LUT_row,'sD')    = {sigmaD};
-    ThetaCtrlLUT(LUT_row,'sN')    = {sigmaN};
-    ThetaCtrlLUT(LUT_row,'Du')    = {opt_Du};
-    ThetaCtrlLUT(LUT_row,'Qa')    = {opt_Qa};
-    ThetaCtrlLUT(LUT_row,'fRw')   = {opt_Rwd};
-    ThetaCtrlLUT(LUT_row,'Wgh')   = {opt_Wgh};
-    ThetaCtrlLUT(LUT_row,'mRw')   = {minRwd};
+    Tbl_row = size(DataTable,1)+1;
+    DataTable(Tbl_row,'Exps')  = {ExpSet};
+    DataTable(Tbl_row,'Sim')   = {SimTypeN};
+    DataTable(Tbl_row,'NTraj') = {NTraj};
+    DataTable(Tbl_row,'Ts')    = {Ts};
+    DataTable(Tbl_row,'Hp')    = {Hp};
+    DataTable(Tbl_row,'Wv')    = {Wv};
+    DataTable(Tbl_row,'nSOM')  = {nSOM};
+    DataTable(Tbl_row,'nCOM')  = {nCOM};
+    DataTable(Tbl_row,'nNLM')  = {nNLM};
+    DataTable(Tbl_row,'sD')    = {sigmaD};
+    DataTable(Tbl_row,'sN')    = {sigmaN};
+    DataTable(Tbl_row,'Du')    = {opt_Du};
+    DataTable(Tbl_row,'Qa')    = {opt_Qa};
+    DataTable(Tbl_row,'fRw')   = {opt_Rwd};
+    DataTable(Tbl_row,'Wgh')   = {opt_Wgh};
+    DataTable(Tbl_row,'mRw')   = {minRwd};
     
-    ThetaCtrlLUT(LUT_row,'nEps') = {e0+NEpochs};
-    ThetaCtrlLUT(LUT_row,'Qx')   = {ThLearnt6(1)};
-    ThetaCtrlLUT(LUT_row,'Qy')   = {ThLearnt6(2)};
-    ThetaCtrlLUT(LUT_row,'Qz')   = {ThLearnt6(3)};
-    ThetaCtrlLUT(LUT_row,'Rx')   = {ThLearnt6(4)};
-    ThetaCtrlLUT(LUT_row,'Ry')   = {ThLearnt6(5)};
-    ThetaCtrlLUT(LUT_row,'Rz')   = {ThLearnt6(6)};
-    ThetaCtrlLUT(LUT_row,'RMSE') = {ResLearnt(1)};
-    ThetaCtrlLUT(LUT_row,'TOV')  = {ResLearnt(2)};
+    DataTable(Tbl_row,'nEps') = {e0+NEpochs};
+    DataTable(Tbl_row,'Qx')   = {ThLearnt6(1)};
+    DataTable(Tbl_row,'Qy')   = {ThLearnt6(2)};
+    DataTable(Tbl_row,'Qz')   = {ThLearnt6(3)};
+    DataTable(Tbl_row,'Rx')   = {ThLearnt6(4)};
+    DataTable(Tbl_row,'Ry')   = {ThLearnt6(5)};
+    DataTable(Tbl_row,'Rz')   = {ThLearnt6(6)};
+    DataTable(Tbl_row,'RMSE') = {ResLearnt(1)};
+    DataTable(Tbl_row,'TOV')  = {ResLearnt(2)};
 end
-writetable(ThetaCtrlLUT,'ThetaControlLUT.csv');
-fprintf('Updated ThetaControlLUT.csv\n');
+writetable(DataTable,'LearntCtrl_Data.csv');
+fprintf('Updated LearntCtrl_Data.csv\n');
 
