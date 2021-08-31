@@ -7,10 +7,11 @@ lCloth = 0.3;
 cCloth = [0, -0.4, 0.2];
 aCloth = 0;
 NT = 50;
-savefiles =0;
+plotWAM = 0;
+savefiles = 0;
 
 % Experiment: FROM 8 TO X
-NExp = 10;
+NExp = 8;
 
 % Get initial positions (cloth assumed in XZ)
 u_ini = [cCloth(1)-lCloth/2*cos(aCloth); cCloth(1)+lCloth/2*cos(aCloth);
@@ -209,29 +210,7 @@ Ttcp = [Rtcp, permute(TrajTCP(1:3,:),[1,3,2]);
 
 
 %% Get initial joint positions
-% WAM DH parameters
-d1 = 0;
-d3 = 0.55;
-d5 = 0.3;
-d7 = 0.09;
-
-DH = [0 d1  0     -pi/2;
-      0  0  0      pi/2;
-      0 d3  0.045 -pi/2;
-      0  0 -0.045  pi/2;
-      0 d5  0     -pi/2;
-      0  0  0      pi/2;
-      0 d7  0        0];
-
-% Create WAM Serial Link
-L(1) = Link([DH(1,:), 0]);
-L(2) = Link([DH(2,:), 0]);
-L(3) = Link([DH(3,:), 0]);
-L(4) = Link([DH(4,:), 0]);
-L(5) = Link([DH(5,:), 0]);
-L(6) = Link([DH(6,:), 0]);
-L(7) = Link([DH(7,:), 0]);
-wam = SerialLink(L, 'name', 'WAM [ALA]');
+run("../with_robot/init_WAM.m");
 
 qref = [-pi/2 0.6 0 1.63, 0, 0.9, 0];
 qini = wam.ikine(Ttcp(:,:,1), 'q0',qref);
@@ -249,27 +228,32 @@ TrajWAM(1,2:8) = qini;
 fig1 = figure(1);
 fig1.Color = [1,1,1];
 
-plot3(TrajTCP(1,:), TrajTCP(2,:), TrajTCP(3,:))
-axis equal
-box on
-grid on
+plot3(TrajTCP(1,:), TrajTCP(2,:), TrajTCP(3,:), '-m')
+axis equal; box on; grid on
+%{
 hold on
 plot3(TrajU(1,:), TrajU(3,:), TrajU(5,:))
 plot3(TrajU(2,:), TrajU(4,:), TrajU(6,:))
 hold off
+%}
 set(gca, 'TickLabelInterpreter','latex');
-xlabel('x','Interpreter','latex')
-ylabel('y','Interpreter','latex')
-zlabel('z','Interpreter','latex')
 
-pov = [-50 30];
+pov = [-50 30]; %[-71 8];
 wamws = [-0.4 0.4 -1 0.2 -0.2 0.6];
-wam.plot(qini, 'workspace', wamws, ...
-               'notiles', 'noshadow', 'nobase', ...
-               'jointdiam', 0.6, 'jointlen', 0.8, ...
-               'lightpos', [0.4 0 1], 'fps', 30, ...
-               'linkcolor', [1 0.6 0], 'view', pov, ...
-               'jointcolor', [0.7 0 1], 'pjointcolor', [0.7 0 1]);
+%axis(wamws)
+
+if (plotWAM == 1)
+    wam.plot(qini, 'workspace', wamws, ...
+                   'notiles', 'noshadow', 'nobase', ...
+                   'jointdiam', 0.6, 'jointlen', 0.8, ...
+                   'lightpos', [-0.5 -0.5 1], 'fps', 30, ...
+                   'linkcolor', [1 0.6 0], 'view', pov, ...
+                   'jointcolor', [0.7 0 1], 'pjointcolor', [0.7 0 1]);
+end
+
+xlabel('$X$ [m]','Interpreter','latex')
+ylabel('$Y$ [m]','Interpreter','latex')
+zlabel('$Z$ [m]','Interpreter','latex')
 
 
 %% Animations
@@ -298,7 +282,7 @@ wam.plot(qxvect, 'fps', 100);
 
 
 %% Save trajectories
-if (savefiles)
+if (savefiles==1)
     save(['TrajUs/TrajU_',num2str(NExp),'.mat'],'TrajU');
     save(['TrajTCPs/TrajTCP_',num2str(NExp),'.mat'],'TrajTCP');
     writematrix(TrajWAM,['TrajWAMs/TrajWAM_',num2str(NExp),'.csv']);

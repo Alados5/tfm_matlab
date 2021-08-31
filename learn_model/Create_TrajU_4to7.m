@@ -5,9 +5,10 @@ Ts = 0.01;
 nxS = 10;
 nyS = 10;
 NT = 50;
+savefiles = 0;
 
 % Experiment: FROM 4 TO 7
-NExp = 7;
+NExp = 5;
 
 addpath('..\required_files\cloth_model_FColtraro')
 
@@ -194,7 +195,9 @@ wam.plot(qxvect, 'fps', 100);
 
 
 %% Save trajectories
-save(['TrajUs/TrajU_',num2str(NExp),'.mat'],'TrajU');
-save(['TrajTCPs/TrajTCP_',num2str(NExp),'.mat'],'TrajTCP');
-writematrix(TrajWAM,['TrajWAMs/TrajWAM_',num2str(NExp),'.csv']);
+if (savefiles==1)
+    save(['TrajUs/TrajU_',num2str(NExp),'.mat'],'TrajU');
+    save(['TrajTCPs/TrajTCP_',num2str(NExp),'.mat'],'TrajTCP');
+    writematrix(TrajWAM,['TrajWAMs/TrajWAM_',num2str(NExp),'.csv']);
+end
 

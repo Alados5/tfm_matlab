@@ -1,21 +1,23 @@
 clear; clc;
 
 % Trajectory
-NTraj = 9;
-Trial = 3;
+NTraj = 8;
+Trial = 1;
 
 
 % Processing parameters
-ExpSetN = 8;            % Set of experiments this data will be the base of
-ExpDate = '2021_06_23'; % Date of the experiments (data folder)
-SizeMesh = 4;           % Size of the mesh from the Vision node
-CamTh = 0.04;           % Omit large deviations
-nwght = 0.6;            % Weight for prev/next points
-RegTs = 0.01;           % Regular sample time of resulting trajectory
-TrimTh = 0.001;         % Trim low movements at ini/end
-TrimPad = 50;           % Pad with static points
-SizeSOM = 4;           % New SOM mesh side size
+ExpSetN = 8;              % Set of experiments this data will be the base of
+ExpDate = '2021_06_23';   % Date of the experiments (data folder)
+SizeMesh = 4;             % Size of the mesh from the Vision node
+CamTh = 0.04;             % Omit large deviations
+sigmaG = 2;               % Std. deviation of the time Gaussian filter
+RegTs = 0.02;             % Regular sample time of resulting trajectory
+TrimTh = 0.001;           % Trim low movements at ini/end
+TrimPad = 50;             % Pad with static points
+SizeSOM = 4;              % New SOM mesh side size
 
+nwght = exp(-((1:5).^2)/(2*sigmaG^2));
+%ffull = exp(-((-5:5).^2)/(2*sigmaG^2));
 
 % Plot and save variables
 animOGData = 0;
@@ -25,7 +27,7 @@ animRegData = 0;
 animRszData = 0;
 plot3DType = 1;
 plot2DType = 1;
-saveMat = 1;
+saveMat = 0;
 
 
 % Add directories
@@ -211,9 +213,9 @@ for ptk=1:Npt
         fig1.Children.View = pov;
 
         box on;
-        xlabel('X', 'Interpreter','latex');
-        ylabel('Y', 'Interpreter','latex');
-        zlabel('Z', 'Interpreter','latex');
+        xlabel('$X$ [m]','Interpreter','latex')
+        ylabel('$Y$ [m]','Interpreter','latex')
+        zlabel('$Z$ [m]','Interpreter','latex')
 
         set(gca, 'TickLabelInterpreter','latex');
         pause(1e-6);
@@ -281,12 +283,26 @@ end
 
 
 %% Filter with neighbor means
+fwidth = size(nwght,2);
+ffull = [nwght(end:-1:1), 1, nwght];
 % Choose one
-SOMpos_ext = [All_SOMpos(:,1), All_SOMpos, All_SOMpos(:,end)];
-%SOMpos_ext = [SOMpos_aux(:,1), SOMpos_aux, SOMpos_aux(:,end)];
+%{
+SOMpos_ext = [All_SOMpos(:,1)*ones(1,fwidth), All_SOMpos, ...
+              All_SOMpos(:,end)*ones(1,fwidth)];
+%}
+%{x
+SOMpos_ext = [SOMpos_aux(:,1)*ones(1,fwidth), SOMpos_aux, ...
+              SOMpos_aux(:,end)*ones(1,fwidth)];
+%}
+SOMpos_f = zeros(size(All_SOMpos));
+for fwi=1:length(ffull)
+    SOMpos_fi = ffull(fwi)*SOMpos_ext(:,fwi:end-length(ffull)+fwi);
+    SOMpos_f = SOMpos_f + SOMpos_fi;
+end
+SOMpos_f = SOMpos_f/sum(ffull);
 
-SOMpos_f = (nwght*SOMpos_ext(:,1:end-2) + nwght*SOMpos_ext(:,3:end) + ...
-             SOMpos_ext(:,2:end-1))/(1+2*nwght);
+%SOMpos_f = (nwght*SOMpos_ext(:,1:end-2) + nwght*SOMpos_ext(:,3:end) + ...
+%             SOMpos_ext(:,2:end-1))/(1+2*nwght);
 
     
 % Plot filtered evolution
@@ -546,6 +562,10 @@ if (plot3DType > 0)
     axis equal; grid on; box on
     set(gca,'TickLabelInterpreter','latex');
     
+    xlabel('$X$ [m]','Interpreter','latex')
+    ylabel('$Y$ [m]','Interpreter','latex')
+    zlabel('$Z$ [m]','Interpreter','latex')
+    
 end
 
 
@@ -695,3 +715,52 @@ end
 
 
 
+%% PLOTS FOR MEMORY: FILTERING
+
+fig1 = figure(1);
+fig1.Color = [1,1,1];
+subplot(10,2,1:2:18)
+plot(All_SOMt, All_SOMpos(coord_nl([1,3,5]),:)','LineWidth',1)
+grid on
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([0 All_SOMt(end)])
+set(gca, 'TickLabelInterpreter', 'latex');
+title('\textbf{Raw data for the lower left corner}', 'Interpreter', 'latex')
+subplot(10,2,2:2:18)
+plot(All_SOMt, SOMpos_f(coord_nl([1,3,5]),:)','LineWidth',1)
+grid on
+set(gca,'TickLabelInterpreter','latex');
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([0 All_SOMt(end)])
+ylim([-0.7 0.1001])
+title('\textbf{Filtered data for the lower left corner}', 'Interpreter', 'latex')
+Lgnd=legend('$X$','$Y$','$Z$','orientation','horizontal','Interpreter','latex');
+Lgnd.Position(1) = 0.5-Lgnd.Position(3)/2;
+Lgnd.Position(2) = 0.01;
+
+
+%% PLOTS FOR MEMORY: REGULARIZATION
+
+fig1 = figure(1);
+fig1.Color = [1,1,1];
+subplot(10,2,1:2:18)
+plot(All_SOMt, SOMpos_f(coord_nl([1,3,5]),:)','.-','LineWidth',1,'MarkerSize',12)
+grid on
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([4 4.8])
+set(gca, 'TickLabelInterpreter', 'latex');
+title('\textbf{Filtered data for the lower left corner}', 'Interpreter', 'latex')
+subplot(10,2,2:2:18)
+plot(Rsz_SOMt, Rsz_SOMpos(Rsz_coord_nl([1,3,5]),:)','.-','LineWidth',1,'MarkerSize',12)
+grid on
+set(gca,'TickLabelInterpreter','latex');
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([4 4.8])
+title('\textbf{Regularized data for the lower left corner}', 'Interpreter', 'latex')
+Lgnd=legend('$X$','$Y$','$Z$','orientation','horizontal','Interpreter','latex');
+Lgnd.Position(1) = 0.5-Lgnd.Position(3)/2;
+Lgnd.Position(2) = 0.01;

@@ -110,6 +110,7 @@ avg_lin_error_pos = avg_lin_error(1:3*nCOM^2);
 
 % Ponderate to penalize lower corners more
 err_mask = kron([1 1 1]', (floor(nCOM-1/nCOM:-1/nCOM:0)'+1)/nCOM);
+% or 1 - floor(mod((1:3*nCOM^2)'-1,nCOM^2)/nCOM)/nCOM
 wavg_lin_error_pos = avg_lin_error_pos.*err_mask.^2;
 
 % Final Reward

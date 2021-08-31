@@ -3,9 +3,10 @@
 
 clear; clc;
 
-filename = 'somstate_smpc.mat';
+filename = 'somstate_rotproof.mat';
 NTraj = 6;
 Ts = 0.01;
+nx = 10;
 
 
 load(['results\',filename]);
@@ -13,9 +14,10 @@ Ref_l = load(['trajectories\ref_',num2str(NTraj),'L.csv']);
 Ref_r = load(['trajectories\ref_',num2str(NTraj),'R.csv']);
 nPtRef = size(Ref_l,1);
 time = 0:Ts:nPtRef*Ts-Ts;
+%time = load('results\somtime_visionraw_rl.mat');
+%time = time.store_time;
 
-nx = 10;
-ny = 10;
+ny = nx;
 Nd_S = nx*ny;
 
 coord_nl = [1 nx 1+Nd_S Nd_S+nx 2*Nd_S+1 2*Nd_S+nx];
@@ -73,7 +75,7 @@ end
 
 subplot(2,4,3)
 plot(time, All_uSOM([1,3,5],:)','linewidth',1.5)
-title('\textbf{Left upper corner}', 'Interpreter', 'latex')
+title('\textbf{Upper left corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
 ylabel('Position [m]', 'Interpreter', 'latex')
@@ -82,7 +84,7 @@ set(gca, 'TickLabelInterpreter', 'latex');
 
 subplot(2,4,4)
 plot(time, All_uSOM([2,4,6],:)','linewidth',1.5);
-title('\textbf{Right upper corner}', 'Interpreter', 'latex')
+title('\textbf{Upper right corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
 ylabel('Position [m]', 'Interpreter', 'latex')
@@ -94,7 +96,7 @@ plot(time,store_state(coord_nl([1 3 5]),:)', 'linewidth',1.5);
 hold on
 plot(time,Ref_l, '--k', 'linewidth',1.2);
 hold off
-title('\textbf{Left lower corner}', 'Interpreter', 'latex')
+title('\textbf{Lower left corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
 ylabel('Position [m]', 'Interpreter', 'latex')
@@ -106,7 +108,7 @@ pa1som = plot(time,store_state(coord_nl([2 4 6]),:)', 'linewidth',1.5);
 hold on
 pa1ref = plot(time,Ref_r, '--k', 'linewidth',1.2);
 hold off
-title('\textbf{Right lower corner}', 'Interpreter', 'latex')
+title('\textbf{Lower right corner}', 'Interpreter', 'latex')
 grid on
 xlabel('Time [s]', 'Interpreter', 'latex')
 ylabel('Position [m]', 'Interpreter', 'latex')

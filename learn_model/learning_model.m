@@ -30,15 +30,6 @@ opts.NTrial = NTrial;
 opts.nSOM = SizeSOM;
 % Real Data options
 opts.ExpDate = ExpDate;
-% CL Options
-opts.Hp = 30;
-opts.NTraj = 3;
-opts.xbound = 1;
-opts.ubound = 5*1e-3;
-opts.gbound = 0;  % 0 -> Equality constraint
-opts.W_Q = 1;
-opts.W_T = 1;
-opts.W_R = 10;
 % ----------
 
 
