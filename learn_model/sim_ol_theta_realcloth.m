@@ -115,6 +115,7 @@ wavg_lin_error_pos = avg_lin_error_pos.*err_mask.^2;
 
 % Final Reward
 Rwd = -norm(wavg_lin_error_pos, 1);
+%Rwd = -(err_mask'.^2 * avg_lin_error_pos); %Same thing
 
 fprintf([' Reward: ', num2str(Rwd), '\n']);
 

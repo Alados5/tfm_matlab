@@ -15,6 +15,7 @@ ThCols = contains(MdlData.Properties.VariableNames, 'Th_');
 
 % Remove exps and trajectories not fit for learning
 MdlData = MdlData(~sum(MdlData.ExpSetN==[0:2,11], 2), :);
+%MdlData = MdlData(~sum(MdlData.NExp==[1:7,12:13], 2), :);
 MdlData = MdlData(~sum(MdlData.NExp==[1:7,10,12:13], 2), :);
 %MdlData = MdlData(~sum(MdlData.NTrial==3, 2), :);
 MdlData(MdlData.Rwd<-1200,'Rwd')={-1200};
@@ -321,6 +322,10 @@ TableWavgsT.Properties.VariableNames = {'NTraj', 'Ts', ...
 
 %% nCOM & Ts loop
 
+fig1 = figure(1);
+fig1.Color = [1,1,1];
+fig1.Units = 'normalized';
+fig1.Position = [0.05 0.5 0.275 0.35];
 fig2 = figure(2);
 fig2.Color = [1,1,1];
 fig2.Units = 'normalized';
@@ -328,7 +333,7 @@ fig2.Position = [0.05 0.1 0.9 0.35];
 fig3 = figure(3);
 fig3.Color = [1,1,1];
 fig3.Units = 'normalized';
-fig3.Position = [0.05 0.5 0.35 0.35];
+fig3.Position = [0.2 0.5 0.35 0.35];
 fig4 = figure(4);
 fig4.Color = [1,1,1];
 fig4.Units = 'normalized';
@@ -377,6 +382,7 @@ for NCi=AllCOMSizes'
                     box on;
                     set(gca, 'TickLabelInterpreter','latex');
                     xlim([min(AllTrajs)-0.5,max(AllTrajs)+0.5]);
+                    xlabel('Input Trajectory','Interpreter','latex','FontSize',10);
                     %xticklabels({'$k_x$','$k_y$','$k_z$'});
                     ylabel(ThYlabels{thtraj},'Interpreter','latex','FontSize',10);
                 end
@@ -385,7 +391,7 @@ for NCi=AllCOMSizes'
             colormap(cmj(100:900,:));
             cb2ticks = min(abs(TsMdlData.Rwd))+(0:0.1:1)*range(TsMdlData.Rwd);
             cb2ticks = round(cb2ticks*100)/100;
-            cb2 = colorbar('Position',[0.925 0.125 0.02 0.8], ...
+            cb2 = colorbar('Position',[0.9175 0.11 0.0125 0.815], ...
                   'TickLabels',cb2ticks, 'TickLabelInterpreter','latex');
             cb2.Label.String = 'Cost $=|$Reward$|$';
             cb2.Label.Interpreter = 'latex';
@@ -498,12 +504,28 @@ for NCi=AllCOMSizes'
             ylabel('Reward', 'Interpreter','latex')
             %xticklabels({'10','15','20','25'});
             colormap(cmj(100:900,:));
+            
+            figure(1);
+            if(spi ~= 1), hold on; end
+            scatter(spi*ones(size(TsMdlData,1),1), TsMdlData.Rwd,25,RwTsMdlData,'filled');
+            hold off
+            grid on;
+            box on;
+            set(gca, 'TickLabelInterpreter','latex');
+            ylim([min(max(-1200, min(TsMdlData.Rwd)), min(ylim)) 0]);
+            xlim([0.5 spi+0.5])
+            %xticklabels({'10','15','20','25'});
+            ylabel('Reward', 'Interpreter','latex')
+            colormap(cmj(100:900,:));
+            
         end
         spi = spi+1;
 
     end
     
 end
+TsLabels8 = num2cell([AllTs;AllTs]);
+xticklabels(TsLabels8);
 
 % Result Tables
 TableMeansN = array2table(TableMeansN);
@@ -522,23 +544,23 @@ TableWavgsN.Properties.VariableNames = {'MdlSz', 'Ts', ...
 
 %% Save final table
 if(saveTable==1)
-    writetable(TableMediansN,'ThetaMdl_LUT.csv');
+    writetable(TableWavgsN,'ThetaMdl_LUT.csv');
     fprintf('Saved ThetaMdl_LUT.csv\n');
 end
 
   
 %% Linear Regression
 
-AllResults = table2array(TableMediansN);
-RX = AllResults(:,1:2);
+AllResults = table2array(TableWavgsN);
+RX = [AllResults(:,1), 1000*AllResults(:,2)];
 RX = [RX, RX.^2 RX(:,1).*RX(:,2)];
 RY = AllResults(:,3:end);
 
 RK = (RX'*RX)\RX'*RY;
 
 %{x
-rSz = 7;
-rTs = 0.025;
+rSz = 6; %n
+rTs = 10; %ms
 rX  = [rSz rTs rSz^2 rTs^2 rSz*rTs];
 rY  = rX*RK;
 %}

@@ -127,42 +127,53 @@ elseif(plotType == 4)
     grid on
     set(gca,'TickLabelInterpreter','latex');
     xlabel('Epoch', 'Interpreter','latex');
-    ylabel('$\mu(k)$ [N/m]', 'Interpreter','latex');
-    title('\textbf{Stiffness}', 'Interpreter','latex');
+    ylabel('$\mu(k)$ [N/m]', 'Interpreter','latex','FontSize',11);
+    title('\textbf{Stiffness}', 'Interpreter','latex','FontSize',12);
     subplot(2,3,2)
     plot(0:NFiles*NEpochs, MW(:,4:6))
     grid on
     set(gca,'TickLabelInterpreter','latex');
     xlabel('Epoch', 'Interpreter','latex');
-    ylabel('$\mu(b)$ [Ns/m]', 'Interpreter','latex');
-    title('\textbf{Damping}', 'Interpreter','latex');
+    ylabel('$\mu(b)$ [Ns/m]', 'Interpreter','latex','FontSize',11);
+    title('\textbf{Damping}', 'Interpreter','latex','FontSize',12);
     subplot(2,3,3)
-    plot(0:NFiles*NEpochs, 0.01*MW(:,7))
+    plot(0:NFiles*NEpochs, 0.01*MW(:,7), 'Color',[0.9290 0.6940 0.1250])
     grid on
     set(gca,'TickLabelInterpreter','latex');
     xlabel('Epoch', 'Interpreter','latex');
-    ylabel('$\mu(\Delta l_{0z})$ [m]', 'Interpreter','latex');
-    title('\textbf{Length}', 'Interpreter','latex');
+    ylabel('$\mu(\Delta l_{0z})$ [m]', 'Interpreter','latex','FontSize',11);
+    title('\textbf{Length}', 'Interpreter','latex','FontSize',12);
 
-    subplot(2,3,4)
+    sp4=subplot(2,3,4);
     plot(0:NFiles*NEpochs, 100*SWD(:,1:3))
     grid on
     set(gca,'TickLabelInterpreter','latex');
     xlabel('Epoch', 'Interpreter','latex');
-    ylabel('$\sigma(k)$ [N/m]', 'Interpreter','latex');
-    subplot(2,3,5)
-    plot(0:NFiles*NEpochs, SWD(:,4:6))
+    ylabel('$\sigma(k)$ [N/m]', 'Interpreter','latex','FontSize',11);
+    sp5=subplot(2,3,5);
+    ph5=plot(0:NFiles*NEpochs, SWD(:,4:6));
     grid on
     set(gca,'TickLabelInterpreter','latex');
     xlabel('Epoch', 'Interpreter','latex');
-    ylabel('$\sigma(b)$ [Ns/m]', 'Interpreter','latex');
-    subplot(2,3,6)
-    plot(0:NFiles*NEpochs, 0.01*SWD(:,7))
+    ylabel('$\sigma(b)$ [Ns/m]', 'Interpreter','latex','FontSize',11);
+    sp6=subplot(2,3,6);
+    plot(0:NFiles*NEpochs, 0.01*SWD(:,7), 'Color',[0.9290 0.6940 0.1250])
     grid on
     set(gca,'TickLabelInterpreter','latex');
     xlabel('Epoch', 'Interpreter','latex');
-    ylabel('$\sigma(\Delta l_{0z})$ [m]', 'Interpreter','latex');
+    ylabel('$\sigma(\Delta l_{0z})$ [m]', 'Interpreter','latex','FontSize',11);
+    
+    sp4.Position(2)=0.15;
+    sp5.Position(2)=0.15;
+    sp6.Position(2)=0.15;
+    
+    Lgnd = legend(ph5, '$x$','$y$','$z$', 'FontSize',10, ...
+        'orientation','horizontal','Interpreter','latex');
+    Lgnd.Position(1) = 0.5-Lgnd.Position(3)/2;
+    Lgnd.Position(2) = 0.02;
 
+    
+    
 elseif(plotType == 5)
     i = round(2/3*size(TH,3));
     rwi = RW(:,:,i);

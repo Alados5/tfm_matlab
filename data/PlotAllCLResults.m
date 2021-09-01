@@ -3,10 +3,10 @@
 
 clear; clc;
 
-filename = 'somstate_rotproof.mat';
+filename = 'somstate_somrec_trajU10.mat';
 NTraj = 6;
 Ts = 0.01;
-nx = 10;
+nx = 4;
 
 
 load(['results\',filename]);
