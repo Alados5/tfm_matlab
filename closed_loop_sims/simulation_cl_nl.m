@@ -17,8 +17,8 @@ NTraj = 10;
 Ts = 0.02;
 Hp = 25;
 nSOM = 7;
-nCOM = 7;
-zsum0 = 0.013;
+nCOM = 4;
+zsum0 = 0.007;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters

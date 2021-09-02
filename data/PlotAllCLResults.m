@@ -3,10 +3,10 @@
 
 clear; clc;
 
-filename = 'somstate_somrec_trajU10.mat';
-NTraj = 6;
-Ts = 0.01;
-nx = 4;
+filename = 'somstate_traj10_n7_ts20.mat';
+NTraj = 10; %6;
+Ts = 0.02; %0.01;
+nx = 7; %4
 
 
 load(['results\',filename]);
