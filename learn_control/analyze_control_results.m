@@ -163,7 +163,7 @@ end
 
 %% Add colorbars
 
-NTicks = 6;
+NTicks = 7;
 
 figure(1);
 for spi=1:length(AllRwFcns)*length(AllWghTypes)

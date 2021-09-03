@@ -1,10 +1,10 @@
 close all; clc; clear;
 
 %% Initialization
-ExpSet = 3;
-SimType = 'RTM'; %LIN, NL, RTM
-ExpNote = '_Det_W1_RwdE_Qk_u';
-NTraj = 6;
+ExpSet = 4;
+SimType = 'LIN'; %LIN, NL, RTM
+ExpNote = '_Det_W2';
+NTraj = 8; %6, 8, 13
 Ts = 0.020;
 Hp = 25;
 Wv = 0.3;
@@ -16,12 +16,12 @@ sigmaN = 0.0;
 ubound  = 50*1e-3;  % (Enough Displ.)
 gbound  = 0;        % (Eq. Constraint)
 
-opt_Du  = 0;  % 0=u,      1=Du
+opt_Du  = 1;  % 0=u,      1=Du
 opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
-opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
-opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
+opt_Rwd = 3;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
+opt_Wgh = 2;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
-e0 = 15;
+e0 = 5;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
@@ -267,11 +267,11 @@ for epoch=1:size(MW2D,2)
     theta.R = diag(theta6(2,:));
 
     if SimTypeN==2
-        [Rwd, AllData] = simulation_cl_rtm_theta(theta, opts);
+        [Rwd, AllData] = sim_cl_rtm_theta(theta, opts);
     elseif SimTypeN==1
-        [Rwd, AllData] = simulation_cl_nl_theta(theta, opts);
+        [Rwd, AllData] = sim_cl_nl_theta(theta, opts);
     else
-        [Rwd, AllData] = simulation_cl_lin_theta(theta, opts);
+        [Rwd, AllData] = sim_cl_lin_theta(theta, opts);
     end
     RWMW(epoch) = Rwd;
 end
@@ -430,14 +430,20 @@ end
 
 % Distribution plots
 %{
-foo = mvnrnd(mw,Sw,10);
-foo1 = foo./max(foo,[],2);
-scatter(foo1(:,1),foo1(:,2),'ob','filled')
-grid on; box on; axis equal;
+fooN = 20;
+foo0 = abs(mvnrnd(mw0,Sw0,fooN));
+foo1 = abs(mvnrnd(mw,Sw,fooN));
+foo0n = foo0./max(foo0,[],2);
+foo1n = foo1./max(foo1,[],2);
+scatter(foo1n(:,1),foo1n(:,2),'ob','filled')
 hold on
+%scatter(foo0n(:,1),foo0n(:,2),'*r')
+%scatter(foo0(:,1),foo0(:,2),'.m')
+%scatter(foo1(:,1),foo1(:,2),'.c')
+grid on; box on; axis equal;
 plot([1,1,0],[0,1,1],'--k')
-xlim([0 1.1])
-ylim([0 1.1])
+xlim([0 1.2])
+ylim([0 1.2])
 hold off
 %}
 
