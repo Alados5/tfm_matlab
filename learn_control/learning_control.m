@@ -1,10 +1,10 @@
 close all; clc; clear;
 
 %% Initialization
-ExpSet = 4;
+ExpSet = 5;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Det';
-NTraj = 18; % Exps4: 3, 6, 8, 12, 13. Exps5: 18,19
+NTraj = 19; % Exps4: 3, 6, 8, 12, 13. Exps5: 18,19
 Ts = 0.020;
 Hp = 25;
 Wv = 0.3;
@@ -21,7 +21,7 @@ opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
 opt_Rwd = 3;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
 opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
-e0 = 0;
+e0 = 5;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;

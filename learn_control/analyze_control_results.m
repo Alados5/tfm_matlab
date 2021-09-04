@@ -2,8 +2,6 @@ clear; clc;
 
 %% Initialization
 
-saveTable = 0;
-
 CtrlData = readtable('LearntCtrl_Data.csv');
 WColNames = {'Qx','Qy','Qz','Rx','Ry','Rz'};
 
@@ -47,19 +45,19 @@ KPIData = table2array(CtrlData(:,{'RMSE','TOV'}));
 KPIData01 = (KPIData-min(KPIData))./range(KPIData);
 
 for RFi=AllRwFcns'
-    
+
     RwFcnData = CtrlData(CtrlData.fRw==RFi,:);
-    
-    
+
+
     for WTi=AllWghTypes'
-        
+
         WghTypeData = RwFcnData(RwFcnData.Wgh==WTi,:);
-        
+
         X4Data = table2array(WghTypeData(:,{'Du','Qa'}));
         W4Data = table2array(WghTypeData(:,WCols));
         R4Data = table2array(WghTypeData(:,KPIColNames));
         C4Data = KPIData01((CtrlData.Wgh==WTi) & (CtrlData.fRw==RFi), :);
-        
+
         figure(1);
         hsp = subplot(length(AllRwFcns),length(AllWghTypes),spi);
         scatter(X4Data(:,1),X4Data(:,2),[],C4Data(:,1),'filled');
@@ -71,7 +69,7 @@ for RFi=AllRwFcns'
         hsp.FontSize=10;
         hsp.TickLabelInterpreter='latex';
         colormap(cmj(100:900,:))
-        
+
         figure(2);
         hsp = subplot(length(AllRwFcns),length(AllWghTypes),spi);
         scatter(X4Data(:,1),X4Data(:,2),[],C4Data(:,2),'filled');
@@ -83,7 +81,7 @@ for RFi=AllRwFcns'
         hsp.FontSize=10;
         hsp.TickLabelInterpreter='latex';
         colormap(cmj(100:900,:))
-        
+
         figure(3);
         subplot(length(AllRwFcns),length(AllWghTypes),spi)
         if(WTi==1)
@@ -102,8 +100,8 @@ for RFi=AllRwFcns'
             ylabel('$R$','Interpreter','latex','FontSize',10)
             set(gca, 'TickLabelInterpreter', 'latex');
             colormap lines;
-            
-        elseif(WTi==2)            
+
+        elseif(WTi==2)
             scatter3(W4Data(:,1),W4Data(:,2),W4Data(:,3),[],1:4,'filled');
             hold on
             scatter3(W4Data(:,4),W4Data(:,4),W4Data(:,4),[],1:4,'filled');
@@ -120,7 +118,7 @@ for RFi=AllRwFcns'
             zlabel('$z$','Interpreter','latex','FontSize',10)
             set(gca, 'TickLabelInterpreter', 'latex');
             colormap lines;
-            
+
         elseif(WTi==3)
             scatter3(W4Data(:,1),W4Data(:,2),W4Data(:,3),[],1:4,'filled');
             hold on
@@ -144,9 +142,9 @@ for RFi=AllRwFcns'
             zlabel('$z$','Interpreter','latex','FontSize',10)
             set(gca, 'TickLabelInterpreter', 'latex');
             colormap lines;
-            
+
         end
-        
+
         if(spi==1)
             lgnd = legend(hp3, '$u,Q_k$\quad','$\Delta u,Q_k$\quad', ...
                     '$u,Q_a$\quad','$\Delta u,Q_a$\quad', ...
@@ -154,9 +152,9 @@ for RFi=AllRwFcns'
             lgnd.Position(1) = 0.5-lgnd.Position(3)/2;
             lgnd.Position(2) = 0.01;
         end
-        
+
         spi = spi+1;
-        
+
     end
 end
 
@@ -167,10 +165,10 @@ NTicks = 7;
 
 figure(1);
 for spi=1:length(AllRwFcns)*length(AllWghTypes)
-    
+
     hsp = subplot(length(AllRwFcns),length(AllWghTypes),spi);
     hsp.Position(1)=hsp.Position(1)-0.05;
-    
+
 end
 cb1ticks = min(KPIData(:,1))+linspace(0,1,NTicks)*range(KPIData(:,1));
 cb1ticks = round(cb1ticks*100)/100;
@@ -182,10 +180,10 @@ cb1.Label.FontSize = 10;
 
 figure(2);
 for spi=1:length(AllRwFcns)*length(AllWghTypes)
-    
+
     hsp = subplot(length(AllRwFcns),length(AllWghTypes),spi);
     hsp.Position(1)=hsp.Position(1)-0.05;
-    
+
 end
 cb2ticks = min(KPIData(:,2))+linspace(0,1,NTicks)*range(KPIData(:,2));
 cb2ticks = round(cb2ticks*100)/100;
@@ -194,3 +192,27 @@ cb2 = colorbar('Position',[0.89 0.149 0.02 0.776], ...
 cb2.Label.String = '$t_c/T_s$';
 cb2.Label.Interpreter = 'latex';
 cb2.Label.FontSize = 10;
+
+
+
+%% For Exps4
+
+CtrlData4 = readtable('LearntCtrl_Data.csv');
+WColNames4 = {'Qx','Qy','Qz','Rx'}; %Rx=Ry=Rz always
+
+% Keep only experiments to analyze
+CtrlData4 = CtrlData4(CtrlData4.Exps==4, :);
+
+% Experiments for analysis: Exps4, Sim0, Ts20, Hp25, n4-4, s0, Du, Qk, Rw3
+VarColNames4 = {'NTraj','Wgh'};
+KPIColNames4 = {'RMSE','TOV'};
+
+% Filter unnecessary columns
+CtrlData4 = CtrlData4(:, [VarColNames4(:)', WColNames4(:)', KPIColNames4(:)']);
+WCols = contains(CtrlData4.Properties.VariableNames, WColNames4);
+
+AllTrajs = unique(CtrlData4.NTraj);
+AllWghTypes = unique(CtrlData4.Wgh);
+
+KPIData4 = table2array(CtrlData4(:,{'RMSE','TOV'}));
+KPIData4_01 = (KPIData4-min(KPIData4))./range(KPIData4);
