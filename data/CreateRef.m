@@ -1,14 +1,16 @@
 clear; clc;
 
+%% Create Trajectory
+
 % Parameters
 lCloth = 0.3;
 cCloth = [0, -0.4, 0.1];
 aCloth = 0;
-NT = 50;
-savefiles = 1;
+NT = 25;
+savefiles = 0;
 
 % Ref Num: 
-NRef = 16;
+NRef = 19;
 
 % Get initial positions 
 r_ini = [cCloth(1)-lCloth/2*cos(aCloth); cCloth(1)+lCloth/2*cos(aCloth);
@@ -219,9 +221,103 @@ elseif NRef == 16
                                  zeros(2,2*NT)];
     TrajR(:,24*NT+1:26*NT) = TrajR(:,24*NT)*ones(1,2*NT);
     
+elseif NRef == 17
+    TrajR(:,NT+1:3*NT) = TrajR(:,NT)*ones(1,2*NT) + ...
+                                [zeros(2,2*NT);
+                                -linspace(0,1,2*NT).^2*0.1.*ones(2,1);
+                                 zeros(2,2*NT)];
+    TrajR(:,3*NT+1:5*NT) = TrajR(:,3*NT)*ones(1,2*NT) + ...
+                                [zeros(2,2*NT);
+                                -linspace(0.002,0.2,2*NT).*ones(2,1);
+                                 zeros(2,2*NT)];
+    XNT=5;
+    FNT=5+XNT;
+    TrajR(:,5*NT+1:FNT*NT) = TrajR(:,5*NT)*ones(1,XNT*NT) + ...
+                                [lCloth*(1-cos(linspace(0,pi/2,XNT*NT)));
+                                 zeros(1,XNT*NT);
+                                -lCloth*(sin(linspace(0,pi/2,XNT*NT)));
+                                 zeros(1,XNT*NT);
+                                 zeros(2,XNT*NT)];
+    INT=FNT;
+    XNT=2;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                                [linspace(0.002,0.2,XNT*NT).*ones(2,1);
+                                 zeros(2,XNT*NT);
+                                 zeros(2,XNT*NT)];
+    INT=FNT;
+    XNT=10;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                                [lCloth*(sin(linspace(0,pi,XNT*NT)));
+                                 lCloth*(sin(linspace(0,pi,XNT*NT)));
+                                 zeros(2,XNT*NT);
+                                 lCloth*(1-cos(linspace(0,pi,XNT*NT)));
+                                 lCloth*(1-cos(linspace(0,pi,XNT*NT)))];
+                             
+    INT=FNT;
+    XNT=2;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                               [-(1-linspace(1,0,XNT*NT).^2)*0.1.*ones(2,1);
+                                 zeros(2,XNT*NT);
+                                 zeros(2,XNT*NT)];
     
+    INT=FNT;
+    XNT=1;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT);
     
+elseif NRef == 18
+    INT=1;
+    XNT=4;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                                [zeros(2,XNT*NT);
+                                -linspace(0,1,XNT*NT).^2*0.1.*ones(2,1);
+                                 zeros(2,XNT*NT)];
+    INT=FNT;
+    XNT=18;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                                [zeros(2,XNT*NT);
+                                -lCloth*(sin(linspace(0,pi,XNT*NT)));
+                                -lCloth*(sin(linspace(0,pi,XNT*NT)));
+                                 lCloth*(1-cos(linspace(0,pi,XNT*NT)));
+                                 lCloth*(1-cos(linspace(0,pi,XNT*NT)))];
+    INT=FNT;
+    XNT=4;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                                [zeros(2,XNT*NT);
+                                (1-linspace(1,0,XNT*NT).^2)*0.1.*ones(2,1);
+                                 zeros(2,XNT*NT)];
     
+    INT=FNT;
+    XNT=1;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT);
+    
+elseif NRef == 19
+    INT=1;
+    XNT=9;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                                [zeros(2,XNT*NT);
+                                -linspace(0.004,0.4,XNT*NT).*ones(2,1);
+                                 zeros(2,XNT*NT)];
+    INT=FNT;
+    XNT=16;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT) + ...
+                                [zeros(2,XNT*NT);
+                                 linspace(0.004,0.4,XNT*NT).*ones(2,1);
+                                 linspace(0.006,0.6,XNT*NT).*ones(2,1)];
+                             
+    INT=FNT;
+    XNT=2;
+    FNT=INT+XNT;
+    TrajR(:,INT*NT+1:FNT*NT) = TrajR(:,INT*NT)*ones(1,XNT*NT);
 end
 
 
