@@ -36,9 +36,9 @@ animwWAM = 0;
 % Add required directories, import CasADi
 addpath('../required_files/cloth_model_New_L')
 if (ispc)
-    addpath('../required_files/casadi-toolbox')
+    addpath('../required_files/casadi-toolbox-windows')
 elseif (ismac)
-    disp('Download CasADi for Mac and add its path!');
+    addpath('../required_files/casadi-toolbox-mac')
 end
 import casadi.*
 
