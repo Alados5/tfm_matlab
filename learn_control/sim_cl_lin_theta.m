@@ -139,7 +139,7 @@ u0 = P(2, 1:6)';
 Rp = P(2+(1:6), 1:Hp+1);
 
 x(:,1) = x0;
-delta_u = [u(:,1) - 0*u0, diff(u,1,2)];
+delta_u = [u(:,1) - u0, diff(u,1,2)];
 
 % Optimization variables
 w = u(:);
@@ -222,10 +222,10 @@ store_state(:,1) = x_ini_SOM;
 store_noisy(:,1) = x_ini_SOM;
 store_u(:,1) = zeros(6,1);
 
-tT0 = tic;
-t0 = tic;
+tT = 0;
 printX = floor(nPtRef/5);
 for tk=2:nPtRef
+    t0 = tic;
     
     % The last Hp timesteps, trajectory should remain constant
     if tk>=nPtRef-(Hp+1) 
@@ -317,18 +317,16 @@ for tk=2:nPtRef
     Rcloth = [cloth_x cloth_y cloth_z];
     
     % Store things
+    tT = tT + toc(t0);
     store_state(:,tk) = [pos_nxt_SOM; vel_nxt_SOM];
     store_noisy(:,tk) = [pos_noisy; vel_nxt_SOM];
     store_u(:,tk) = u_lin;
     
     if(mod(tk,printX)==0)
-        t10 = toc(t0)*1000;
         fprintf([' - Iter: ', num2str(tk), ...
-            ' \t Avg. time/iter: ', num2str(t10/printX), ' ms \n']);
-        t0 = tic;
+            ' \t Avg. time/iter: ', num2str(tT/tk*1000), ' ms \n']);
     end
 end
-tT = toc(tT0);
 fprintf([' -- Total time: \t',num2str(tT),' s \n', ...
          ' -- Avg. t/iter: \t',num2str(tT/nPtRef*1000),' ms \n']);
 

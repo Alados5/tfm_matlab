@@ -216,3 +216,98 @@ AllWghTypes = unique(CtrlData4.Wgh);
 
 KPIData4 = table2array(CtrlData4(:,{'RMSE','TOV'}));
 KPIData4_01 = (KPIData4-min(KPIData4))./range(KPIData4);
+
+
+%% For Exps7
+
+clear; clc;
+
+%loadtraj = 'traj6_ts20_hp25_ns4_nc4';
+loadtraj = 'traj13_ts20_hp20_ns4_nc4';
+
+load(['Exps7\0_LIN_Det\',loadtraj,'\TH_0-2.mat'])
+load(['Exps7\0_LIN_Det\',loadtraj,'\RW_0-2.mat'])
+
+fig4 = figure(4);
+fig4.Color = [1,1,1];
+fig4.Units = 'normalized';
+fig4.Position = [0.05 0.3 0.9 0.4];
+
+cmj = jet(1000);
+
+Data0 = [TH(:,:,1)', RW(:,:,1)'];
+Data1 = [TH(:,:,2)', RW(:,:,2)'];
+
+Data0f = Data0(Data0(:,3)~=-10, :);
+Data0f(:,3) = (Data0f(:,3)-min(Data0f(:,3)))/range(Data0f(:,3));
+Data0f = Data0f(Data0f(:,3)>0.98, :);
+Data0f(:,3) = (Data0f(:,3)-min(Data0f(:,3)))/range(Data0f(:,3));
+
+Data1f = Data1(Data1(:,3)~=-10, :);
+Data1f_abs = Data1f(:,3);
+Data1f(:,3) = (Data1f(:,3)-min(Data1f(:,3)))/range(Data1f(:,3));
+threshold = 0.5;
+Data1f_abs = Data1f_abs(Data1f(:,3)>threshold);
+Data1f = Data1f(Data1f(:,3)>threshold, :);
+Data1f(:,3) = (Data1f(:,3)-min(Data1f(:,3)))/range(Data1f(:,3));
+
+hsp=subplot(1,3,1);
+plot([1;1;0],[0;1;1],'--k');
+hold on
+scatter(Data0(:,1), Data0(:,2), [], -Data0(:,3), 'filled')
+hold off
+axis equal; grid on
+xlim([0 1.1])
+ylim([0 1.1])
+xlabel('$Q$','Interpreter','latex','FontSize',10)
+ylabel('$R$','Interpreter','latex','FontSize',10)
+hsp.FontSize=11;
+hsp.TickLabelInterpreter='latex';
+colormap(cmj(100:900,:))
+cb7 = colorbar('TickLabelInterpreter','latex');
+cb7.Label.String = 'RMSE [mm]';
+cb7.Label.Interpreter = 'latex';
+cb7.Label.FontSize = 11;
+title('\textbf{Results of the first epoch}', 'Interpreter', 'latex', 'FontSize',14)
+
+hsp=subplot(1,3,2);
+plot([1;1;0],[0;1;1],'--k');
+hold on
+scatter(Data1(:,1), Data1(:,2), [], -Data1(:,3), 'filled')
+hold off
+axis equal; grid on
+xlim([0 1.1])
+ylim([0 1.1])
+xlabel('$Q$','Interpreter','latex','FontSize',10)
+ylabel('$R$','Interpreter','latex','FontSize',10)
+hsp.FontSize=11;
+hsp.TickLabelInterpreter='latex';
+colormap(cmj(100:900,:))
+cb7 = colorbar('TickLabelInterpreter','latex');
+cb7.Label.String = 'RMSE [mm]';
+cb7.Label.Interpreter = 'latex';
+cb7.Label.FontSize = 11;
+title('\textbf{Results of the second epoch}', 'Interpreter', 'latex', 'FontSize',14)
+
+hsp=subplot(1,3,3);
+plot([1;1;0],[0;1;1],'--k');
+hold on
+scatter(Data0f(:,1), Data0f(:,2), [], 1-Data0f(:,3), 'filled')
+%scatter(Data1f(:,1), Data1f(:,2), [], -Data1f_abs, 'filled')
+hold off
+axis equal; grid on
+xlim([0 1.1])
+ylim([0 1.1])
+xlabel('$Q$','Interpreter','latex','FontSize',10)
+ylabel('$R$','Interpreter','latex','FontSize',10)
+hsp.FontSize=11;
+hsp.TickLabelInterpreter='latex';
+colormap(cmj(100:900,:))
+cb7 = colorbar('TickLabelInterpreter','latex');
+cb7.Label.String = 'RMSE [mm]';
+cb7.Label.Interpreter = 'latex';
+cb7.Label.FontSize = 11;
+title('\textbf{Best 2\% of second epoch results}', 'Interpreter', 'latex', 'FontSize',14)
+
+
+
