@@ -5,15 +5,10 @@ Closed-loop simulation of an MPC applied to a linear cloth model
 %}
 clear; close all; clc;
 
-addpath('..\required_files\cloth_model_New_L\')
-addpath('..\required_files\casadi-toolbox')
-import casadi.*
-
-
 % General Parameters
 NTraj = 6;
-Ts = 0.01;
-Hp = 15;
+Ts = 0.02;
+Hp = 25;
 nSOM = 4;
 nCOM = 4;
 TCPOffset_local = [0; 0; 0.09];
@@ -21,20 +16,31 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 ubound = 50*1e-3;
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.01;
-W_R = 1.00;
+W_Q = 0.7218;
+W_R = 1;
 opt_du  = 1;
 opt_Qa  = 0;
-opt_sto = 1;
+opt_sto = 0;
+opt_noise = 0;
 
 % Noise parameters
-sigmaD = 0.003; % m/s
-sigmaN = 0.004; % m
+sigmaD = opt_noise*0.003; % m/s
+sigmaN = opt_noise*0.004; % m
 
 % Plotting options
 plotAnim = 0;
 animwWAM = 0;
 % ---------------------
+
+
+% Add required directories, import CasADi
+addpath('../required_files/cloth_model_New_L')
+if (ispc)
+    addpath('../required_files/casadi-toolbox')
+elseif (ismac)
+    disp('Download CasADi for Mac and add its path!');
+end
+import casadi.*
 
 
 % Load trajectory to follow

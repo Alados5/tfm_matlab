@@ -7,12 +7,6 @@ Closed-loop simulation of an MPC applied to cloth models
 %}
 clear; close all; clc;
 
-addpath('..\required_files\cloth_model_New_NL\')
-addpath('..\required_files\cloth_model_New_L\')
-addpath('..\required_files\casadi-toolbox')
-import casadi.*
-
-
 % General Parameters
 NTraj = 6;
 Ts = 0.010;
@@ -41,6 +35,17 @@ plotAnim = 1;
 animwWAM = 1;
 plot_nlm = 0;
 % ---------------------
+
+
+% Add required directories, import CasADi
+addpath('../required_files/cloth_model_New_L')
+addpath('../required_files/cloth_model_New_NL')
+if (ispc)
+    addpath('../required_files/casadi-toolbox-windows')
+elseif (ismac)
+    disp('Download CasADi for Mac and add its path!');
+end
+import casadi.*
 
 
 % Load trajectory to follow

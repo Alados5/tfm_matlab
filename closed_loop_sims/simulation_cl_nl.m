@@ -6,12 +6,6 @@ Closed-loop simulation of an MPC applied to a nonlinear cloth model
 %}
 clear; close all; clc;
 
-addpath('..\required_files\cloth_model_New_NL\')
-addpath('..\required_files\cloth_model_New_L\')
-addpath('..\required_files\casadi-toolbox')
-import casadi.*
-
-
 % General Parameters
 NTraj = 10;
 Ts = 0.02;
@@ -38,6 +32,17 @@ sigmaN = 0*0.001; % m
 plotAnim = 0;
 animwWAM = 0;
 % ---------------------
+
+
+% Add required directories, import CasADi
+addpath('../required_files/cloth_model_New_L')
+addpath('../required_files/cloth_model_New_NL')
+if (ispc)
+    addpath('../required_files/casadi-toolbox')
+elseif (ismac)
+    disp('Download CasADi for Mac and add its path!');
+end
+import casadi.*
 
 
 % Load trajectory to follow
