@@ -1,8 +1,12 @@
 function [Rwd, AllData] = sim_cl_nl_theta(theta, opts)
 
-addpath('..\required_files\cloth_model_New_NL\')
-addpath('..\required_files\cloth_model_New_L\')
-addpath('..\required_files\casadi-toolbox')
+addpath('../required_files/cloth_model_New_L')
+addpath('../required_files/cloth_model_New_NL')
+if (ispc)
+    addpath('../required_files/casadi-toolbox-windows')
+elseif (ismac)
+    addpath('../required_files/casadi-toolbox-mac')
+end
 import casadi.*
 
 % Simulation Parameters
@@ -118,7 +122,7 @@ u0 = P(2, 1:6)';
 Rp = P(2+(1:6), 1:Hp+1);
 
 x(:,1) = x0;
-delta_u = [u(:,1) - 0*u0, diff(u,1,2)];
+delta_u = [u(:,1) - u0, diff(u,1,2)];
 
 % Optimization variables
 w = u(:);

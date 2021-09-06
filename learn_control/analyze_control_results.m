@@ -7,8 +7,8 @@ WColNames = {'Qx','Qy','Qz','Rx','Ry','Rz'};
 
 % Keep only experiments to analyze
 CtrlData = CtrlData(CtrlData.Exps==3, :);
-%CtrlData = CtrlData(~sum(CtrlData.Sim==[1,2], 2), :);
-CtrlData = CtrlData(~sum(CtrlData.Sim==[0,1], 2), :);
+CtrlData = CtrlData(~sum(CtrlData.Sim==[1,2], 2), :);
+%CtrlData = CtrlData(~sum(CtrlData.Sim==[0,1], 2), :);
 
 % Experiments for analysis: Exps3, Sim0, Traj6, Ts20, Hp25, n4-4, s0
 VarColNames = {'Du','Qa','fRw','Wgh'};
@@ -68,6 +68,8 @@ for RFi=AllRwFcns'
         ylabel('Using $Q_a$?','Interpreter','latex','FontSize',10)
         hsp.FontSize=10;
         hsp.TickLabelInterpreter='latex';
+        caxis manual
+        caxis([0 1]);
         colormap(cmj(100:900,:))
 
         figure(2);
@@ -80,6 +82,8 @@ for RFi=AllRwFcns'
         ylabel('Using $Q_a$?','Interpreter','latex','FontSize',10)
         hsp.FontSize=10;
         hsp.TickLabelInterpreter='latex';
+        caxis manual
+        caxis([0 1]);
         colormap(cmj(100:900,:))
 
         figure(3);
@@ -161,7 +165,7 @@ end
 
 %% Add colorbars
 
-NTicks = 7;
+NTicks = 6;
 
 figure(1);
 for spi=1:length(AllRwFcns)*length(AllWghTypes)

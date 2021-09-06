@@ -3,15 +3,18 @@
 
 clear; clc;
 
-filename = 'somstate_traj10_n7_ts20.mat';
-NTraj = 10; %6;
-Ts = 0.02; %0.01;
-nx = 7; %4
+%filename = 'somstate_traj10_n7_ts20.mat';
+filename = 'somstate_cpp_test1.csv';
+NTraj = 1; %6;
+Ts = 0.01; %0.01;
+nx = 4; %4
 
 
-load(['results\',filename]);
-Ref_l = load(['trajectories\ref_',num2str(NTraj),'L.csv']);
-Ref_r = load(['trajectories\ref_',num2str(NTraj),'R.csv']);
+
+store_state = readmatrix(['results/',filename]);
+load(['results/',filename]);
+Ref_l = load(['trajectories/ref_',num2str(NTraj),'L.csv']);
+Ref_r = load(['trajectories/ref_',num2str(NTraj),'R.csv']);
 nPtRef = size(Ref_l,1);
 time = 0:Ts:nPtRef*Ts-Ts;
 %time = load('results\somtime_visionraw_rl.mat');
