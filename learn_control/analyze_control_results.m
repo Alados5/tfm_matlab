@@ -198,44 +198,20 @@ cb2.Label.Interpreter = 'latex';
 cb2.Label.FontSize = 10;
 
 
-
 %% For Exps4
-
-CtrlData4 = readtable('LearntCtrl_Data.csv');
-WColNames4 = {'Qx','Qy','Qz','Rx'}; %Rx=Ry=Rz always
-
-% Keep only experiments to analyze
-CtrlData4 = CtrlData4(CtrlData4.Exps==4, :);
-
-% Experiments for analysis: Exps4, Sim0, Ts20, Hp25, n4-4, s0, Du, Qk, Rw3
-VarColNames4 = {'NTraj','Wgh'};
-KPIColNames4 = {'RMSE','TOV'};
-
-% Filter unnecessary columns
-CtrlData4 = CtrlData4(:, [VarColNames4(:)', WColNames4(:)', KPIColNames4(:)']);
-WCols = contains(CtrlData4.Properties.VariableNames, WColNames4);
-
-AllTrajs = unique(CtrlData4.NTraj);
-AllWghTypes = unique(CtrlData4.Wgh);
-
-KPIData4 = table2array(CtrlData4(:,{'RMSE','TOV'}));
-KPIData4_01 = (KPIData4-min(KPIData4))./range(KPIData4);
-
-
-%% For Exps7
 
 clear; clc;
 
-%loadtraj = 'traj6_ts20_hp25_ns4_nc4';
-loadtraj = 'traj13_ts20_hp20_ns4_nc4';
+loadtraj = 'traj6_ts20_hp25_ns4_nc4';
+%loadtraj = 'traj13_ts20_hp20_ns4_nc4';
 
-load(['Exps7\0_LIN_Det\',loadtraj,'\TH_0-2.mat'])
-load(['Exps7\0_LIN_Det\',loadtraj,'\RW_0-2.mat'])
+load(['Exps4/0_LIN_Det/',loadtraj,'/TH_0-2.mat'])
+load(['Exps4/0_LIN_Det/',loadtraj,'/RW_0-2.mat'])
 
 fig4 = figure(4);
 fig4.Color = [1,1,1];
 fig4.Units = 'normalized';
-fig4.Position = [0.05 0.3 0.9 0.4];
+fig4.Position = [0.05 0.3 0.875 0.4];
 
 cmj = jet(1000);
 
@@ -272,7 +248,7 @@ cb7 = colorbar('TickLabelInterpreter','latex');
 cb7.Label.String = 'RMSE [mm]';
 cb7.Label.Interpreter = 'latex';
 cb7.Label.FontSize = 11;
-title('\textbf{Results of the first epoch}', 'Interpreter', 'latex', 'FontSize',14)
+title('\textbf{First epoch results}', 'Interpreter', 'latex', 'FontSize',14)
 
 hsp=subplot(1,3,2);
 plot([1;1;0],[0;1;1],'--k');
@@ -291,13 +267,13 @@ cb7 = colorbar('TickLabelInterpreter','latex');
 cb7.Label.String = 'RMSE [mm]';
 cb7.Label.Interpreter = 'latex';
 cb7.Label.FontSize = 11;
-title('\textbf{Results of the second epoch}', 'Interpreter', 'latex', 'FontSize',14)
+title('\textbf{Second epoch results}', 'Interpreter', 'latex', 'FontSize',14)
 
 hsp=subplot(1,3,3);
 plot([1;1;0],[0;1;1],'--k');
 hold on
-scatter(Data0f(:,1), Data0f(:,2), [], 1-Data0f(:,3), 'filled')
-%scatter(Data1f(:,1), Data1f(:,2), [], -Data1f_abs, 'filled')
+%scatter(Data0f(:,1), Data0f(:,2), [], 1-Data0f(:,3), 'filled')
+scatter(Data1f(:,1), Data1f(:,2), [], -Data1f_abs, 'filled')
 hold off
 axis equal; grid on
 xlim([0 1.1])

@@ -1,12 +1,12 @@
 close all; clc; clear;
 
 %% Initialization
-ExpSet = 7;
+ExpSet = 4;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Det';
-NTraj = 13; % Exps4: 3, 6, 8, 12, 13. Exps5: 18,19
-Ts = 0.02;
-Hp = 20;
+NTraj = 3; % Exps4: 6, 3, 8, 13, 12. Exps5: 18, 19
+Ts = 0.020;
+Hp = 25;
 Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
@@ -118,8 +118,10 @@ if e0==0
         Sw0 = diag([0.5; 0.5; 0.5; 1]);
     elseif opt_Wgh==2
         %[qx; qy; qz; r]
-        mw0 = [0.5; 0.5; 0.5; 0.5];
-        Sw0 = diag([0.5; 0.5; 0.5; 0.5]);
+        %mw0 = [0.5; 0.5; 0.5; 0.5];
+        %Sw0 = diag([0.5; 0.5; 0.5; 0.5]);
+        mw0 = [0.9 0.9 0.9 0.2]';
+        Sw0 = diag([0.1 0.1 0.1 0.05]);
     else
         %[q; r]
         mw0 = [0.5; 0.5];        %[0.5; 0.5]; [0.0; 1.0]; [1.0; 0.0];
@@ -430,21 +432,40 @@ end
 
 % Distribution plots
 %{
-fooN = 20;
+fooN = 100;
 foo0 = abs(mvnrnd(mw0,Sw0,fooN));
 foo1 = abs(mvnrnd(mw,Sw,fooN));
 foo0n = foo0./max(foo0,[],2);
 foo1n = foo1./max(foo1,[],2);
+
+% Two weights
 scatter(foo1n(:,1),foo1n(:,2),'ob','filled')
 hold on
 %scatter(foo0n(:,1),foo0n(:,2),'*r')
 %scatter(foo0(:,1),foo0(:,2),'.m')
 %scatter(foo1(:,1),foo1(:,2),'.c')
-grid on; box on; axis equal;
 plot([1,1,0],[0,1,1],'--k')
+hold off
+grid on; box on; axis equal;
 xlim([0 1.2])
 ylim([0 1.2])
+
+% XYZ Weights
+scatter3(foo1n(:,1),foo1n(:,2),foo1n(:,3),'ob','filled')
+hold on
+%scatter3(foo0n(:,1),foo0n(:,2),foo0n(:,3),'*r')
+plot3([1;1;0;0;1;1],[0;1;1;0;0;0],[1;1;1;1;1;0],'--k');
+plot3([0;0;1;1;0;0],[1;0;0;1;1;1],[0;0;0;0;0;1],'--k');
+plot3([0;0],[0;0],[1;0],'--k');
+plot3([1;1],[1;1],[1;0],'--k');
 hold off
+grid on; box on; axis equal;
+xlim([0 1.1])
+ylim([0 1.1])
+zlim([0 1.1])
+xlabel('Qx');
+ylabel('Qy');
+zlabel('Qz');
 %}
 
 
