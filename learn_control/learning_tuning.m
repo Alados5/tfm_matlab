@@ -6,7 +6,7 @@ SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Tuning_Det';
 NTraj = 6;
 Ts = 0.020;
-Hp = 25;
+Hp = 20;
 Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
@@ -21,7 +21,7 @@ opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
 opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
 opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
-e0 = 5;
+e0 = 0;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
@@ -191,7 +191,7 @@ while epoch <= NEpochs
             bd(1) = theta.R;
             fprintf([' Theta Bounds: [',num2str(bd,5),']\n']);
         elseif (Rwd > rwrd_top)
-            bd(2) = 1.05*theta.R;
+            bd(2) = 1.01*theta.R;
             rwrd_top = Rwd;
             fprintf([' Theta Bounds: [',num2str(bd,5),']\n']);
         end
@@ -257,7 +257,7 @@ theta.Q = ThLearnt(1);
 theta.R = ThLearnt(2);
 
 fprintf(['\nExecuting with learnt parameters...\n', ...
-         '---------------------------------------']);
+         '---------------------------------------\n']);
 if SimTypeN==2
     [Rwd, AllData] = sim_cl_rtm_theta(theta, opts);
 elseif SimTypeN==1

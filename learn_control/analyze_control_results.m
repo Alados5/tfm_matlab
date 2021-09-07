@@ -244,7 +244,7 @@ data1n = [data1r(:,1), data1r(:,2) - min(data1r(:,2))];
 fig4 = figure(4);
 fig4.Color = [1,1,1];
 fig4.Units = 'normalized';
-fig4.Position = [0.05 0.1 0.5 0.4];
+fig4.Position = [0.05 0.1 0.9 0.4];
 
 hsp=subplot(1,3,1);
 plot([1;1;0],[0;1;1],'--k');
@@ -310,14 +310,14 @@ title('\textbf{Best 2\% of second epoch results}', 'Interpreter', 'latex', 'Font
 fig5 = figure(5);
 fig5.Color = [1,1,1];
 fig5.Units = 'normalized';
-fig5.Position = [0.05 0.3 0.5 0.4];
+fig5.Position = [0.05 0.3 0.7 0.4];
 
-files = dir(fullfile('Exps4/0_LIN_Det','traj*'));
-NFiles = size(files,1);
+Trajs = [6,3,13,12,16];
+NFiles = length(Trajs);
 
 hsp=subplot(1,1,1);
 for f=1:NFiles
-    filename = files(f).name;
+    filename = ['traj',num2str(Trajs(f)),'_ts20_hp25_ns4_nc4'];
     
     load(['Exps4/0_LIN_Det/',filename,'/TH_0-2.mat'])
     load(['Exps4/0_LIN_Det/',filename,'/RW_0-2.mat'])
@@ -339,7 +339,7 @@ for f=1:NFiles
     data1n = [data1r(:,1), (data1r(:,2) - min(data1r(:,2)))/range(data1r(:,2))];
     
     if (f>1), hold on; end
-    plot(data1n(:,1), data1n(:,2));
+    plot(data1n(:,1), data1n(:,2), 'LineWidth',1);
 
 end
 
@@ -348,7 +348,9 @@ grid on
 xlim([0 1])
 xlabel('Ratio $R/Q$','Interpreter','latex','FontSize',10)
 ylabel('Normalized RMSE','Interpreter','latex','FontSize',10)
-hsp.FontSize=12;
+hsp.FontSize=11;
 hsp.TickLabelInterpreter='latex';
-title('\textbf{Results}', 'Interpreter', 'latex', 'FontSize',14)
+title('\textbf{Results for all the analyzed trajectories}', 'Interpreter', 'latex', 'FontSize',14)
 
+legend('Traj. 0', 'Traj. 1', 'Traj. 2', 'Traj. 3', 'Traj. 4', ...
+       'Location','SouthEast','Interpreter','latex');
