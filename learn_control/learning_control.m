@@ -4,7 +4,7 @@ close all; clc; clear;
 ExpSet = 4;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Det';
-NTraj = 13; % Exps4: 6, 3, 13, 12. Exps5: 18, 19
+NTraj = 16; % Exps4: 6, 3, 13, 12, 16
 Ts = 0.020;
 Hp = 25;
 Wv = 0.3;

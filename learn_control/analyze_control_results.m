@@ -202,7 +202,7 @@ cb2.Label.FontSize = 10;
 
 clear; clc;
 
-loadtraj = 'traj13_ts20_hp25_ns4_nc4';
+loadtraj = 'traj12_ts20_hp25_ns4_nc4';
 
 load(['Exps4/0_LIN_Det/',loadtraj,'/TH_0-2.mat'])
 load(['Exps4/0_LIN_Det/',loadtraj,'/RW_0-2.mat'])
@@ -210,7 +210,7 @@ load(['Exps4/0_LIN_Det/',loadtraj,'/RW_0-2.mat'])
 fig4 = figure(4);
 fig4.Color = [1,1,1];
 fig4.Units = 'normalized';
-fig4.Position = [0.05 0.3 0.875 0.4];
+fig4.Position = [0.05 0.3 0.9 0.4];
 
 cmj = jet(1000);
 
