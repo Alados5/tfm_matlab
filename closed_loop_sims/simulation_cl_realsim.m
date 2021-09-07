@@ -9,9 +9,9 @@ clear; close all; clc;
 
 % General Parameters
 NTraj = 6;
-Ts = 0.010;
-Hp = 15;
-Wv = 0.3;
+Ts = 0.02;
+Hp = 25;
+Wv = 0.2;
 nSOM = 4;
 nCOM = 4;
 nNLM = 10;
@@ -20,19 +20,20 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 ubound = 50*1e-3;
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.05;
-W_R = 1.00;
+W_Q = 1.00;
+W_R = 0.70;
 opt_du  = 1;
 opt_Qa  = 0;
 opt_sto = 0;
+opt_noise = 0;
 
 % Noise parameters
-sigmaD = 0.003; % m/s
-sigmaN = 0.003; % m
+sigmaD = opt_noise*0.003; % m/s
+sigmaN = opt_noise*0.003; % m
 
 % Plotting options
-plotAnim = 1;
-animwWAM = 1;
+plotAnim = 0;
+animwWAM = 0;
 plot_nlm = 0;
 % ---------------------
 
