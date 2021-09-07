@@ -5,11 +5,21 @@ clear; clc; close all;
 filename = 'simlin_traj6';
 save_noload = 0;
 
-Qs=[0:0.05:1,ones(1,20), 0:0.05:1, 0:0.05:0.5, 0:0.1:1];
-Rs=[ones(1,20),1:-0.05:0, 0:0.05:1, 0:0.1:1, 0:0.05:0.5];
+NTraj = 6;
+Ts = 0.025;
+Hp = 15;
+Wv = 0.3;
+nSOM = 4;
+nCOM = 4;
+nNLM = 10;
+ubound = 50*1e-3;
+opt_noise = 0;
+
 
 %Qs=[0:0.05:1,ones(1,20)];
 %Rs=[ones(1,20),1:-0.05:0];
+Qs=[0:0.05:1,ones(1,20), 0:0.05:1, 0:0.05:0.5, 0:0.1:1];
+Rs=[ones(1,20),1:-0.05:0, 0:0.05:1, 0:0.1:1, 0:0.05:0.5];
 
 RMSEs = zeros(length(Qs),1);
 TIMEs = zeros(length(Qs),1);
@@ -24,7 +34,8 @@ if (save_noload==1)
 
         W_Q = Qs(wi);
         W_R = Rs(wi);
-        simulation_cl_lin;
+        sim_cl_lin_sweep;
+        %sim_cl_rtm_sweep;
         RMSEs(wi) = 1000*eRMSEp;
         TIMEs(wi) = tT/nPtRef*1000;
 
@@ -33,11 +44,11 @@ if (save_noload==1)
 
     close all;
 
-    save(['RMSEs_',filename,'.mat'], 'RMSEs');
-    save(['TIMEs_',filename,'.mat'], 'TIMEs');
+    save(['data/RMSEs_',filename,'.mat'], 'RMSEs');
+    save(['data/TIMEs_',filename,'.mat'], 'TIMEs');
 else
-    load(['RMSEs_',filename,'.mat'], 'RMSEs');
-    load(['TIMEs_',filename,'.mat'], 'TIMEs');
+    load(['data/RMSEs_',filename,'.mat'], 'RMSEs');
+    load(['data/TIMEs_',filename,'.mat'], 'TIMEs');
 end
 
 
@@ -184,11 +195,12 @@ cb3.Label.FontSize = 11;
 title('\textbf{Added points with same ratio}', 'Interpreter', 'latex', 'FontSize',14)
 
 
-
+%{
 fig3 = figure(3);
 fig3.Color = [1,1,1];
 fig3.Units = 'normalized';
 fig3.Position = [0.05 0.15 0.9 0.4];
+%}
 
 %scatter(Qd(fi),Rd(fi),[],RMSEs(fi),'filled');
 

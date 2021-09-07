@@ -5,8 +5,8 @@ ExpSet = 5;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Tuning_Det';
 NTraj = 6;
-Ts = 0.020;
-Hp = 20;
+Ts = 0.015;
+Hp = 15;
 Wv = 0.3;
 nSOM = 4;
 nCOM = 4;
@@ -194,6 +194,11 @@ while epoch <= NEpochs
             bd(2) = 1.01*theta.R;
             rwrd_top = Rwd;
             fprintf([' Theta Bounds: [',num2str(bd,5),']\n']);
+        end
+        
+        if diff(bd) < 1e-6
+            fprintf('BOUNDS ARE TOO CLOSE! ABORTING');
+            break;
         end
 
         wghts_ep(:,i) = thetai;
