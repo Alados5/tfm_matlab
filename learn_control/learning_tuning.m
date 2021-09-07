@@ -21,7 +21,7 @@ opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
 opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
 opt_Wgh = 1;  % 1=[q r],  2=[qx qy qz r],  3=[qx qy qz k]
 
-e0 = 0;
+e0 = 5;
 minRwd = -10;
 NSamples = 10;
 NEpochs = 5;
@@ -122,9 +122,9 @@ else
     SWans = SWans.SW;
     Sw0 = SWans(:,:,end);
     
-    RWans = load([dirname,'/RW_',prevrange,'.mat']);
-    RWans = RWans.RW;
-    rwrd_ans = RWans(:,:,end);
+    RWans = load([dirname,'/RWMW_',prevrange,'.mat']);
+    RWans = RWans.RWMW;
+    rwrd_ans = RWans(end);
     rwrd_top = rwrd_ans;
     
     BDans = load([dirname,'/BD_',prevrange,'.mat']);
@@ -140,11 +140,13 @@ SW = zeros(NParams,NParams,NEpochs+1);
 TH = zeros(NParams,NSamples,NEpochs);
 RW = zeros(1,NSamples,NEpochs);
 BD = zeros(1,2,NEpochs+1);
+RWMW = zeros(1,NEpochs+1);
 XR = cell(1,NSamples,NEpochs);
 
 MW(:,:,1) = mw0;
 SW(:,:,1) = Sw0;
 BD(:,:,1) = bounds0;
+RWMW(1) = rw0;
 
 
 %% Main Learning Loop
@@ -185,11 +187,11 @@ while epoch <= NEpochs
         end
         Rwd = max(Rwd, minRwd);
         
-        if (Rwd == minRwd)
+        if (Rwd == minRwd || Rwd<2*rwrd_top)
             bd(1) = theta.R;
             fprintf([' Theta Bounds: [',num2str(bd,5),']\n']);
         elseif (Rwd > rwrd_top)
-            bd(2) = 1.1*theta.R;
+            bd(2) = 1.05*theta.R;
             rwrd_top = Rwd;
             fprintf([' Theta Bounds: [',num2str(bd,5),']\n']);
         end
@@ -208,6 +210,7 @@ while epoch <= NEpochs
         dw = REPSupdate(rw_ext);
         
         mw = th_ext(:,rw_ext==max(rw_ext));
+        rwrd_ans = max(rw_ext);
         
         Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
         summ = 0;
@@ -219,10 +222,10 @@ while epoch <= NEpochs
         MW(:,:,epoch+1) = mw;
         SW(:,:,epoch+1) = Sw;
         BD(:,:,epoch+1) = bd;
+        RWMW(epoch+1)   = rwrd_ans;
         TH(:,:,epoch)   = wghts_ep;
         RW(:,:,epoch)   = rwrds_ep;
-        
-        rwrd_ans = max(rw_ext);
+
         epoch = epoch+1;
     end
 
@@ -236,7 +239,6 @@ end
 epochrange = [num2str(e0),'-',num2str(e0+NEpochs)];
 RW2D = permute(RW, [2,3,1]);
 RWm = mean(RW2D);
-RWMW = [rw0 max(RW2D)];
 
 save([dirname,'/MW_',epochrange,'.mat'],'MW');
 save([dirname,'/SW_',epochrange,'.mat'],'SW');
@@ -254,6 +256,8 @@ theta = struct;
 theta.Q = ThLearnt(1);
 theta.R = ThLearnt(2);
 
+fprintf(['\nExecuting with learnt parameters...\n', ...
+         '---------------------------------------']);
 if SimTypeN==2
     [Rwd, AllData] = sim_cl_rtm_theta(theta, opts);
 elseif SimTypeN==1
@@ -265,7 +269,8 @@ ResLearnt = [AllData.eRMSE, AllData.eTov];
 
 ThLearnt6 = [ThLearnt(1)*ones(1,3) ThLearnt(2)*ones(1,3)];
 fprintf(['\nLearnt Theta:  [',num2str(ThLearnt6,5),']']);
-fprintf(['\nFinal Results: [RMSE = ',num2str(ResLearnt(1),5),', \t' ...
+fprintf(['\nTheta Bounds:  [',num2str(bd,5),']\n']);
+fprintf(['\nFinal KPIs: [RMSE = ',num2str(ResLearnt(1),5),', \t' ...
            'TOV = ',num2str(ResLearnt(2),5),']\n']);
        
 
@@ -430,13 +435,13 @@ cmj = jet(1000);
 plot([1,1],bd,'--k')
 hold on
 scatter([1,1],bd,100,'+k');
-scatter([1;1;1],MW(2,1,:),[],-RWMW','filled')
+scatter(ones(size(MW,3),1),MW(2,1,:),[],-RWMW','filled')
 scatter(1,bd(1),200,'xm','LineWidth',2);
 plot([1,1],[0,bd(1)],'m','LineWidth',2);
 hold off
 grid on; box on; axis equal;
-xlim([0.9 1.1])
-ylim([0 0.3])
+xlim([0.95 1.05])
+ylim([0.1 0.25])
 colormap(cmj(100:900,:))
 set(gca, 'TickLabelInterpreter', 'latex');
 %}

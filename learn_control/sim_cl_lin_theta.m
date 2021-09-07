@@ -342,7 +342,7 @@ error_r = 1000*(store_state(S_coord_lc([2,4,6]),:)'-Ref_r);
 %eMAE = mean(abs([error_l error_r]));
 %eMAEp  = mean([norm(eMAE([1,3,5]),2) norm(eMAE([2,4,6]),2)]);
 eRMSE = sqrt(mean([error_l error_r].^2));
-%eRMSE = sqrt(mean([error_l(4:end,:) error_r(4:end,:)].^2));
+%eRMSE = sqrt(mean([error_l(5:end,:) error_r(5:end,:)].^2));
 eRMSEp = mean([norm(eRMSE([1,3,5]),2) norm(eRMSE([2,4,6]),2)]);
 eTov = max(tT/(nPtRef*Ts) - 1, 0);
 
