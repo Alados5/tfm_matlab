@@ -4,7 +4,7 @@ close all; clc; clear;
 ExpSet = 4;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Det';
-NTraj = 3; % Exps4: 6, 3, 8, 13, 12. Exps5: 18, 19
+NTraj = 13; % Exps4: 6, 3, 13, 12. Exps5: 18, 19
 Ts = 0.020;
 Hp = 25;
 Wv = 0.3;
@@ -118,14 +118,12 @@ if e0==0
         Sw0 = diag([0.5; 0.5; 0.5; 1]);
     elseif opt_Wgh==2
         %[qx; qy; qz; r]
-        %mw0 = [0.5; 0.5; 0.5; 0.5];
-        %Sw0 = diag([0.5; 0.5; 0.5; 0.5]);
-        mw0 = [0.9 0.9 0.9 0.2]';
-        Sw0 = diag([0.1 0.1 0.1 0.05]);
+        mw0 = [0.5; 0.5; 0.5; 0.5];
+        Sw0 = diag([0.5; 0.5; 0.5; 0.5]);
     else
         %[q; r]
-        mw0 = [0.5; 0.5];        %[0.5; 0.5]; [0.0; 1.0]; [1.0; 0.0];
-        Sw0 = diag([0.5; 0.5]);  %[0.01; 0.05]
+        mw0 = [0.5; 0.5];
+        Sw0 = diag([0.5; 0.5]);
     end
 else
     % Continue experiment

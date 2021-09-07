@@ -202,8 +202,7 @@ cb2.Label.FontSize = 10;
 
 clear; clc;
 
-loadtraj = 'traj6_ts20_hp25_ns4_nc4';
-%loadtraj = 'traj13_ts20_hp20_ns4_nc4';
+loadtraj = 'traj13_ts20_hp25_ns4_nc4';
 
 load(['Exps4/0_LIN_Det/',loadtraj,'/TH_0-2.mat'])
 load(['Exps4/0_LIN_Det/',loadtraj,'/RW_0-2.mat'])
