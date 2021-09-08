@@ -6,9 +6,9 @@ Closed-loop simulation of an MPC applied to a linear cloth model
 clear; close all; clc;
 
 % General Parameters
-NTraj = 13;
-Ts = 0.025;
-Hp = 15;
+NTraj = 16;
+Ts = 0.015;
+Hp = 30;
 nSOM = 4;
 nCOM = 4;
 TCPOffset_local = [0; 0; 0.09];
@@ -17,7 +17,7 @@ TCPOffset_local = [0; 0; 0.09];
 ubound = 50*1e-3;
 gbound = 0; % (Eq. Constraint)
 W_Q = 1;
-W_R = 0.2;
+W_R = 0.1755;
 opt_du  = 1;
 opt_Qa  = 0;
 opt_sto = 0;

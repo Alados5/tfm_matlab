@@ -3,18 +3,18 @@
 
 clear; clc;
 
-filename1 = 'somstate_traj18.mat';
-filename2 = 'somstate_traj19.mat';
-Ref1 = 18;
-Ref2 = 19;
+filename1 = 'somstate_rtm_noise1.mat';
+filename2 = 'somstate_rtm_noise2.mat';
+Ref1 = 13;
+Ref2 = 13;
 Ts = 0.02; %0.01;
 nSOM = 4;
 
 
 somstate1 = load(['results\',filename1]);
-somstate1 = somstate1.store_state;
+somstate1 = somstate1.store_somstate;
 somstate2 = load(['results\',filename2]);
-somstate2 = somstate2.store_state;
+somstate2 = somstate2.store_somstate;
 
 nPt1 = size(somstate1,2);
 nPt2 = size(somstate2,2);
@@ -113,6 +113,7 @@ for fch=1:length(fig1.Children)
     end
 end
 
+%{
 subplot(2,4,3)
 plot(time1(1:end-2), 1e3*Du_1([1,3,5],:)', 'linewidth',1);
 title('\textbf{Slew rate evolution (1)}', 'Interpreter', 'latex')
@@ -132,6 +133,28 @@ ylabel('$\Delta u$ [mm]', 'Interpreter', 'latex')
 xlim([0 time1(end)])
 ylim(Dulim);
 set(gca, 'TickLabelInterpreter', 'latex');
+%}
+
+%{x
+subplot(2,4,3)
+plot(time1,somstate1(coord_ctrl([1 3 5]),:)', 'linewidth',1.5);
+title('\textbf{Upper left corner evolution (1)}', 'Interpreter', 'latex')
+grid on
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([0 time1(end)])
+set(gca, 'TickLabelInterpreter', 'latex');
+
+subplot(2,4,4)
+plot(time1,somstate2(coord_ctrl([1 3 5]),:)', 'linewidth',1.5);
+title('\textbf{Upper left corner evolution (2)}', 'Interpreter', 'latex')
+grid on
+xlabel('Time [s]', 'Interpreter', 'latex')
+ylabel('Position [m]', 'Interpreter', 'latex')
+xlim([0 time1(end)])
+set(gca, 'TickLabelInterpreter', 'latex');
+%}
+
 
 subplot(2,4,7)
 plot(time1,somstate1(coord_nl([1 3 5]),:)', 'linewidth',1.5);
@@ -162,3 +185,10 @@ Lgnd1 = legend([pa1som', pa1ref(1)], ...
                'Orientation','horizontal', 'Interpreter', 'latex');
 Lgnd1.Position(1) = 0.75-Lgnd1.Position(3)/2;
 Lgnd1.Position(2) = 0.01;
+
+%{
+title('\textbf{Lower left corner evolution ({\boldmath$\bar{u}=5$} mm)}', 'Interpreter', 'latex', 'FontSize',12)
+title('\textbf{Lower left corner evolution ({\boldmath$\bar{u}=50$} mm)}', 'Interpreter', 'latex', 'FontSize',12)
+title('\textbf{Upper left corner evolution ({\boldmath$\bar{u}=5$} mm)}', 'Interpreter', 'latex', 'FontSize',12)
+title('\textbf{Upper left corner evolution ({\boldmath$\bar{u}=50$} mm)}', 'Interpreter', 'latex', 'FontSize',12)
+%}

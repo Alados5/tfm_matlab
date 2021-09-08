@@ -8,24 +8,24 @@ Closed-loop simulation of an MPC applied to cloth models
 clear; close all; clc;
 
 % General Parameters
-NTraj = 6;
+NTraj = 13;
 Ts = 0.02;
-Hp = 25;
-Wv = 0.2;
+Hp = 20;
+Wv = 0.25;
 nSOM = 4;
 nCOM = 4;
 nNLM = 10;
 TCPOffset_local = [0; 0; 0.09];
 
 % Opti parameters
-ubound = 50*1e-3;
+ubound = 5*1e-3;
 gbound = 0; % (Eq. Constraint)
 W_Q = 1.00;
-W_R = 0.70;
+W_R = 0.20;
 opt_du  = 1;
 opt_Qa  = 0;
 opt_sto = 0;
-opt_noise = 0;
+opt_noise = 1;
 
 % Noise parameters
 sigmaD = opt_noise*0.003; % m/s

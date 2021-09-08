@@ -4,9 +4,9 @@ close all; clc; clear;
 ExpSet = 5;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Tuning_Det';
-NTraj = 6;
+NTraj = 16;
 Ts = 0.015;
-Hp = 15;
+Hp = 30;
 Wv = 0.3;
 nSOM = 4;
 nCOM = 4;

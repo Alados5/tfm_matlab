@@ -354,3 +354,64 @@ title('\textbf{Results for all the analyzed trajectories}', 'Interpreter', 'late
 
 legend('Traj. 0', 'Traj. 1', 'Traj. 2', 'Traj. 3', 'Traj. 4', ...
        'Location','SouthEast','Interpreter','latex');
+   
+   
+%% For Exps5
+
+clear; clc;
+
+TuningTss = [10 15 20 25];
+TuningHps = [15 20 25 30];
+NFiles = length(TuningTss)*length(TuningHps);
+
+AllMW = zeros(NFiles,2);
+AllRW = zeros(NFiles,1);
+AllBD = zeros(NFiles,2);
+AllHZ = zeros(NFiles,2);
+
+%{
+fig6 = figure(6);
+fig6.Color = [1,1,1];
+fig6.Units = 'normalized';
+fig6.Position = [0.05 0.3 0.7 0.4];
+%}
+
+cmj = jet(1000);
+
+hsp=subplot(1,1,1);
+spi=1;
+for Tsi=1:length(TuningTss)
+    for Hpi=1:length(TuningHps)
+    
+        filename = ['traj6_ts',num2str(TuningTss(Tsi)), ...
+                    '_hp',num2str(TuningHps(Hpi)),'_ns4_nc4'];
+
+        load(['Exps5/0_LIN_Tuning_Det/',filename,'/MW_0-5.mat'])
+        load(['Exps5/0_LIN_Tuning_Det/',filename,'/RWMW_0-5.mat'])
+        load(['Exps5/0_LIN_Tuning_Det/',filename,'/BD_0-5.mat'])
+        
+        MW = MW(:,:,end)';
+        RWMW = RWMW(end);
+        BD = BD(:,:,end);
+        
+        AllHZ(spi,:) = [TuningTss(Tsi) TuningHps(Hpi)];
+        AllMW(spi,:) = MW;
+        AllRW(spi,:) = -RWMW;
+        AllBD(spi,:) = BD;
+        
+        spi=spi+1;
+
+    end
+
+end
+
+
+
+
+
+
+
+
+
+
+
