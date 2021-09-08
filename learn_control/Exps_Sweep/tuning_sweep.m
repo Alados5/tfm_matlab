@@ -2,24 +2,24 @@
 
 clear; clc; close all;
 
-filename = 'simlin_traj6';
+filename = 'simlin_traj6_noisy';
 save_noload = 0;
 
-NTraj = 6;
-Ts = 0.025;
-Hp = 15;
-Wv = 0.3;
-nSOM = 4;
-nCOM = 4;
-nNLM = 10;
-ubound = 50*1e-3;
-opt_noise = 0;
+opts.NTraj = 6;
+opts.Ts = 0.02;
+opts.Hp = 20;
+opts.Wv = 0.15;
+opts.nSOM = 4;
+opts.nCOM = 4;
+opts.nNLM = 10;
+opts.ubound = 50*1e-3;
+opts.opt_noise = 1;
 
 
-%Qs=[0:0.05:1,ones(1,20)];
-%Rs=[ones(1,20),1:-0.05:0];
-Qs=[0:0.05:1,ones(1,20), 0:0.05:1, 0:0.05:0.5, 0:0.1:1];
-Rs=[ones(1,20),1:-0.05:0, 0:0.05:1, 0:0.1:1, 0:0.05:0.5];
+Qs=[0.05:0.05:1,ones(1,19)];
+Rs=[ones(1,19),1:-0.05:0.05];
+%Qs=[0:0.05:1,ones(1,20), 0:0.05:1, 0:0.05:0.5, 0:0.1:1];
+%Rs=[ones(1,20),1:-0.05:0, 0:0.05:1, 0:0.1:1, 0:0.05:0.5];
 
 RMSEs = zeros(length(Qs),1);
 TIMEs = zeros(length(Qs),1);
@@ -30,10 +30,12 @@ TIMEs = zeros(length(Qs),1);
 if (save_noload==1)
     for wi=1:length(Qs)
 
-        clearvars -except Qs Rs RMSEs TIMEs wi
+        clearvars -except Qs Rs RMSEs TIMEs filename wi opts
 
         W_Q = Qs(wi);
         W_R = Rs(wi);
+        fprintf(['\nWeights: \t Q=',num2str(W_Q),' \t R=',num2str(W_R),'\n']);
+        
         sim_cl_lin_sweep;
         %sim_cl_rtm_sweep;
         RMSEs(wi) = 1000*eRMSEp;
@@ -46,16 +48,18 @@ if (save_noload==1)
 
     save(['data/RMSEs_',filename,'.mat'], 'RMSEs');
     save(['data/TIMEs_',filename,'.mat'], 'TIMEs');
+    
 else
     load(['data/RMSEs_',filename,'.mat'], 'RMSEs');
     load(['data/TIMEs_',filename,'.mat'], 'TIMEs');
+    
 end
 
 
 %% Process
 
 RMSEs = min(RMSEs,10);
-fi = RMSEs < min(RMSEs)+0.02*range(RMSEs);
+fi = RMSEs < min(RMSEs)+0.2*range(RMSEs);
 
 theta = atan2(Rs,Qs);
 ratio = Rs./Qs;

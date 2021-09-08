@@ -1,3 +1,15 @@
+% Expand options
+NTraj = opts.NTraj;
+Ts    = opts.Ts;
+Hp    = opts.Hp;
+Wv    = opts.Wv;
+nSOM  = opts.nSOM;
+nCOM  = opts.nCOM;
+nNLM  = opts.nNLM;
+
+ubound    = opts.ubound;
+opt_noise = opts.opt_noise;
+
 % General Parameters
 TCPOffset_local = [0; 0; 0.09];
 
@@ -19,19 +31,19 @@ plot_nlm = 0;
 
 
 % Add required directories, import CasADi
-addpath('../required_files/cloth_model_New_L')
-addpath('../required_files/cloth_model_New_NL')
+addpath('../../required_files/cloth_model_New_L')
+addpath('../../required_files/cloth_model_New_NL')
 if (ispc)
-    addpath('../required_files/casadi-toolbox-windows')
+    addpath('../../required_files/casadi-toolbox-windows')
 elseif (ismac)
-    addpath('../required_files/casadi-toolbox-mac')
+    addpath('../../required_files/casadi-toolbox-mac')
 end
 import casadi.*
 
 
 % Load trajectory to follow
-Ref_l = load(['../data/trajectories/ref_',num2str(NTraj),'L.csv']);
-Ref_r = load(['../data/trajectories/ref_',num2str(NTraj),'R.csv']);
+Ref_l = load(['../../data/trajectories/ref_',num2str(NTraj),'L.csv']);
+Ref_r = load(['../../data/trajectories/ref_',num2str(NTraj),'R.csv']);
 nPtRef = size(Ref_l,1);
 time = 0:Ts:nPtRef*Ts-Ts;
 
@@ -43,7 +55,7 @@ aCloth = atan2(dphi_corners1(2), dphi_corners1(1));
 
 
 % Load parameter table and select corresponding row(s)
-ThetaLUT = readtable('../learn_model/ThetaMdl_LUT.csv');
+ThetaLUT = readtable('../../learn_model/ThetaMdl_LUT.csv');
 LUT_SOM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nSOM);
 LUT_COM_id = (ThetaLUT.Ts == Ts) & (ThetaLUT.MdlSz == nCOM);
 LUT_COM = ThetaLUT(LUT_COM_id, :);
