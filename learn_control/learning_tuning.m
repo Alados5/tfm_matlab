@@ -1,4 +1,15 @@
+%{
+Relative Entropy Policy Search algorithm applied to learn the optimal
+weights of a Model Predictive Controller (greedy tuning)
+- Original linear cloth model by David Parent, modified by Adrià Luque
+- Original REPSupdate function by Adrià Colomé
+- MPC and simulations by Adrià Luque
+- Main code and other functions by Adrià Luque
+- Last Updated: September 2021
+%}
+
 close all; clc; clear;
+
 
 %% Initialization
 ExpSet = 5;

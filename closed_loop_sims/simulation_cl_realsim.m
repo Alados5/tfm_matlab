@@ -74,8 +74,10 @@ if (size(LUT_COM,1) > 1 || size(LUT_SOM,1) > 1)
 elseif (size(LUT_COM,1) < 1 || size(LUT_SOM,1) < 1)
     error("There are no saved experiments with those parameters.");
 else
-    thetaC = table2array(LUT_COM(:, contains(LUT_COM.Properties.VariableNames, 'Th_')));
-    thetaS = table2array(LUT_SOM(:, contains(LUT_SOM.Properties.VariableNames, 'Th_')));
+    thetaC = table2array(LUT_COM(:, contains(LUT_COM.Properties.VariableNames,...
+                                             'Th_')));
+    thetaS = table2array(LUT_SOM(:, contains(LUT_SOM.Properties.VariableNames,...
+                                             'Th_')));
 end
 
 
@@ -122,7 +124,8 @@ pos = create_lin_mesh(lCloth, nSOM, cCloth, aCloth);
 x_ini_SOM = [reshape(pos,[3*nSOM^2 1]); zeros(3*nSOM^2,1)];
 
 % Reduce initial SOM position to COM size if necessary
-[pos_rd,~] = take_reduced_mesh(x_ini_SOM(1:3*nSOM^2),x_ini_SOM(3*nSOM^2+1:6*nSOM^2), nSOM, nCOM);
+[pos_rd,~] = take_reduced_mesh(x_ini_SOM(1:3*nSOM^2), ...
+                               x_ini_SOM(3*nSOM^2+1:6*nSOM^2), nSOM, nCOM);
 x_ini_COM = [pos_rd; zeros(3*nCOM^2,1)];
 
 % Rotate initial COM and SOM positions to XZ plane
@@ -214,7 +217,8 @@ end
 for k = 1:Hp
 
     % Model Dynamics Constraint -> Definition
-    x(:,k+1) = A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM + opt_sto*Bd_COM*d_hat(:,k);
+    x(:,k+1) = A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM + ...
+                              opt_sto*Bd_COM*d_hat(:,k);
     
     % Constraint: Constant distance between upper corners
     x_ctrl = x(COM.coord_ctrl,k+1);
@@ -224,7 +228,8 @@ for k = 1:Hp
     
     
     % Objective function
-    objfun = objfun + (x(C_coord_lc,k+1)-Rp(:,k+1))'*W_Q*Q*(x(C_coord_lc,k+1)-Rp(:,k+1));
+    x_err = x(COM.coord_lc,k+1) - Rp(:,k+1);
+    objfun = objfun + x_err'*W_Q*Q*x_err;
     if (opt_du==0)
         objfun = objfun + u(:,k)'*W_R*u(:,k);
     else
@@ -232,14 +237,14 @@ for k = 1:Hp
     end
 end
 
-
+% Encapsulate in controller object
 opt_prob = struct('f', objfun, 'x', w, 'g', g, 'p', P);
 opt_config = struct;
 opt_config.print_time = 0;
 opt_config.ipopt.print_level = 0; %0 min print - 3 max
 opt_config.ipopt.warm_start_init_point = 'yes'; %warm start
-
 controller = nlpsol('ctrl_sol', 'ipopt', opt_prob, opt_config);
+
 
 
 %----------------------------------%
@@ -301,6 +306,7 @@ store_u(:,1) = zeros(6,1);
 store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
 
+% Start timers and main loop
 tT = 0;
 t1 = tic;
 printX = 100;

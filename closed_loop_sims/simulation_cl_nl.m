@@ -68,7 +68,8 @@ if (size(LUT_Exp,1) > 1)
 elseif (size(LUT_Exp,1) < 1)
     error("There are no saved experiments with those parameters.");
 else
-    theta = table2array(LUT_Exp(:, contains(LUT_Exp.Properties.VariableNames, 'Th_')));
+    theta = table2array(LUT_Exp(:, contains(LUT_Exp.Properties.VariableNames, ...
+                                            'Th_')));
 end
 
 
@@ -112,7 +113,9 @@ S_coord_lc = SOM.coord_lc;
 x_ini_SOM = [reshape(pos,[3*nxS*nyS 1]); zeros(3*nxS*nyS,1)];
 
 % Reduce initial SOM position to COM size if necessary
-[reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
+[reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS), ...
+                                    x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), ...
+                                    nSOM, nCOM);
 x_ini_COM = [reduced_pos; zeros(3*nxC*nyC,1)];
 
 % Rotate initial COM position to XZ plane
@@ -186,7 +189,8 @@ end
 for k = 1:Hp
     
     % Model Dynamics Constraint -> Definition
-    x(:,k+1) = A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM + opt_sto*Bd_COM*d_hat(:,k);
+    x(:,k+1) = A_COM*x(:,k) + B_COM*u(:,k) + COM.dt*f_COM + ...
+                              opt_sto*Bd_COM*d_hat(:,k);
     
     % Constraint: Constant distance between upper corners
     x_ctrl = x(COM.coord_ctrl,k+1);
@@ -205,7 +209,7 @@ for k = 1:Hp
     end
 end
 
-
+% Encapsulate in controller object
 opt_prob = struct('f', objfun, 'x', w, 'g', g, 'p', P);
 opt_config = struct;
 opt_config.print_time = 0;
@@ -262,7 +266,8 @@ while strcmp(warnID, 'MATLAB:nearlySingularMatrix')
     [~, warnID] = lastwarn;
 end
 warning('on','MATLAB:nearlySingularMatrix');
-[reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS),x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM, nCOM);
+[reduced_pos,~] = take_reduced_mesh(x_ini_SOM(1:3*nxS*nyS), ...
+                                    x_ini_SOM(3*nxS*nyS+1:6*nxS*nyS), nSOM,nCOM);
 x_ini_COM = [reduced_pos; zeros(3*nxC*nyC,1)];
 
 % Initialize storage
@@ -273,6 +278,7 @@ store_u(:,1) = zeros(6,1);
 store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
 
+% Start timer and main loop
 tT = 0;
 t1 = tic;
 printX = 100;
@@ -308,7 +314,7 @@ for tk=2:nPtRef
     in_params(2+6+(1:3),1:Hp) = normrnd(0,sigmaD,[3,Hp]); % d_hat
 
     % Initial guess for optimizer (u: increments, guess UC=LC=Ref)
-    args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1); zeros(6,1)];
+    args_x0 = [reshape(diff(in_params(2+(1:6),1:Hp),1,2),6*(Hp-1),1);zeros(6,1)];
     
     % Find the solution "sol"
     t0 = tic;

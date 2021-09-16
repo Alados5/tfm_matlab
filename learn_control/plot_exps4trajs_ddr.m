@@ -6,8 +6,8 @@ fig1.Position = [0.2 0.5 0.5 0.4];
 Ts=0.02;
 
 Ref1 = 6;
-Ref_l = load(['..\data\trajectories\ref_',num2str(Ref1),'L.csv']);
-Ref_r = load(['..\data\trajectories\ref_',num2str(Ref1),'R.csv']);
+Ref_l = load(['../data/trajectories/ref_',num2str(Ref1),'L.csv']);
+Ref_r = load(['../data/trajectories/ref_',num2str(Ref1),'R.csv']);
 Ref_lr = [Ref_l, Ref_r]';
 Ref_lr = Ref_lr([1,4,2,5,3,6],:);
 dR = diff(Ref_lr,1,2);
@@ -25,8 +25,8 @@ ylabel('$d^2r/dt^2$ [mm/step$^2$]', 'Interpreter', 'latex','FontSize',10)
 title('\textbf{Traj. 0}', 'Interpreter', 'latex','FontSize',10)
 
 Ref1 = 3;
-Ref_l = load(['..\data\trajectories\ref_',num2str(Ref1),'L.csv']);
-Ref_r = load(['..\data\trajectories\ref_',num2str(Ref1),'R.csv']);
+Ref_l = load(['../data/trajectories/ref_',num2str(Ref1),'L.csv']);
+Ref_r = load(['../data/trajectories/ref_',num2str(Ref1),'R.csv']);
 Ref_lr = [Ref_l, Ref_r]';
 Ref_lr = Ref_lr([1,4,2,5,3,6],:);
 dR = diff(Ref_lr,1,2);
@@ -45,8 +45,8 @@ title('\textbf{Traj. 1}', 'Interpreter', 'latex','FontSize',10)
 
 Ref1 = 13;
 NPtT8 = 900/2;
-Ref_l = load(['..\data\trajectories\ref_',num2str(Ref1),'L.csv']);
-Ref_r = load(['..\data\trajectories\ref_',num2str(Ref1),'R.csv']);
+Ref_l = load(['../data/trajectories/ref_',num2str(Ref1),'L.csv']);
+Ref_r = load(['../data/trajectories/ref_',num2str(Ref1),'R.csv']);
 Ref_lr = [Ref_l, Ref_r]';
 Ref_lr = Ref_lr([1,4,2,5,3,6],:);
 dR = diff(Ref_lr,1,2);
@@ -69,8 +69,8 @@ plot([NPtT8*Ts NPtT8*Ts], ylim,'--k')
 hold off
 
 Ref1 = 12;
-Ref_l = load(['..\data\trajectories\ref_',num2str(Ref1),'L.csv']);
-Ref_r = load(['..\data\trajectories\ref_',num2str(Ref1),'R.csv']);
+Ref_l = load(['../data/trajectories/ref_',num2str(Ref1),'L.csv']);
+Ref_r = load(['../data/trajectories/ref_',num2str(Ref1),'R.csv']);
 Ref_lr = [Ref_l, Ref_r]';
 Ref_lr = Ref_lr([1,4,2,5,3,6],:);
 dR = diff(Ref_lr,1,2);

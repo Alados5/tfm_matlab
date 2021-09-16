@@ -1,6 +1,19 @@
+%{
+Relative Entropy Policy Search algorithm applied to learn the optimal
+weights of a Model Predictive Controller
+- Original linear cloth model by David Parent, modified by Adrià Luque
+- Original REPSupdate function by Adrià Colomé
+- MPC and simulations by Adrià Luque
+- Main code and other functions by Adrià Luque
+- Last Updated: September 2021
+%}
+
 close all; clc; clear;
 
+
 %% Initialization
+
+% Learning options
 ExpSet = 4;
 SimType = 'LIN'; %LIN, NL, RTM
 ExpNote = '_Det';
@@ -16,6 +29,7 @@ sigmaN = 0.0;
 ubound  = 50*1e-3;  % (Enough Displ.)
 gbound  = 0;        % (Eq. Constraint)
 
+% MPC Structure options
 opt_Du  = 1;  % 0=u,      1=Du
 opt_Qa  = 0;  % 0=Qk,     1=Qa*Qk
 opt_Rwd = 1;  % 1=RMSE,   2=Tov,           3=RMSE+Tov
@@ -27,6 +41,7 @@ NSamples = 100;
 NEpochs = 2;
 UseLambda = 1;
 
+% Plotting options
 Plot3DTraj = 0;
 Plot2DTraj = (e0==0);
 
@@ -102,7 +117,7 @@ else
                    mwi(2) mwi(2) mwi(2) mwi(2) mwi(2) mwi(2)];
 end
 
-% Directory name
+% Directory to save/load experiments
 dirname = ['Exps',num2str(ExpSet), '/',num2str(SimTypeN), ...
            '_', SimType, ExpNote, ...
            '/traj',num2str(NTraj), '_ts',num2str(Ts*1000), ...
@@ -126,7 +141,7 @@ if e0==0
         Sw0 = diag([0.5; 0.5]);
     end
 else
-    % Continue experiment
+    % Load previous set of data (continue experiment)
     prevrange = [num2str(e0-NEpochs),'-',num2str(e0)];
 
     MWans = load([dirname,'/MW_',prevrange,'.mat']);
@@ -143,6 +158,7 @@ else
     THprev = THans(:,:,end);
 end
 
+% Initialize storage variables
 NParams = length(mw0);
 
 MW = zeros(NParams,1,NEpochs+1);
@@ -170,9 +186,11 @@ while epoch <= NEpochs
         
         fprintf(['\nEpoch ', num2str(e0+epoch), ' - Sample: ' num2str(i),'\n']);
         
+        % Encourage exploration increasing variance
         lambda = mean(svd(Sw))/5;
         SwL = Sw + UseLambda*eye(NParams)*lambda;
         
+        % Normalize weights so max=1, retry until valid sample
         thetai = mvnrnd(mw, SwL)';
         th_maxW = max(thetai(ThW));
         thetai(ThW) = thetai(ThW)/th_maxW;
@@ -182,12 +200,14 @@ while epoch <= NEpochs
             thetai(ThW) = thetai(ThW)/th_maxW;
         end
         
+        % Convert to 6 values for xxyyzz for both Q and R
         theta6 = ThM6(thetai);
         theta = struct;
         theta.Q = diag(theta6(1,:));
         theta.R = diag(theta6(2,:));
         fprintf([' Theta: [',num2str(thetai',5),']\n']);
         
+        % Execute simulation
         if SimTypeN==2
             [Rwd, AllData] = sim_cl_rtm_theta(theta, opts);
         elseif SimTypeN==1
@@ -195,17 +215,23 @@ while epoch <= NEpochs
         else
             [Rwd, AllData] = sim_cl_lin_theta(theta, opts);
         end
+        
+        % Saturate to minimum
         Rwd = max(Rwd, minRwd);
 
+        % Save results
         wghts_ep(:,i) = thetai;
         rwrds_ep(i) = Rwd;
         XR{1,i,epoch} = AllData;
     end
     
+    % Repeat epoch if no successful results (above saturation)
     if isequal(unique(rwrds_ep), minRwd)
         fprintf('\nEPOCH HAD NO SUCCESSFUL RESULTS. RE-DOING SAME EPOCH \n');
         pause(1);
+        
     else
+        % Add results of previous epoch to obtain relative weights
         if epoch==1
             if e0==0
                 dw = REPSupdate([rwrds_ep, rwrds_ep]);
@@ -219,15 +245,17 @@ while epoch <= NEpochs
             weights2 = [wghts_ep TH(:,:,epoch-1)];
         end
         
-        Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
+        % Update weights
         mw = sum(weights2'.*dw)'/sum(dw);
         mw(ThW) = mw(ThW)/max(mw(ThW));
+        Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
         summ = 0;
         for ak = 1:size(weights2,2)
             summ = summ + dw(ak)*((weights2(:,ak)-mw)*(weights2(:,ak)-mw)');%/sum(dw);
         end
         Sw = summ./(Z+1e-9);
 
+        % Save epoch results
         MW(:,:,epoch+1) = mw;
         SW(:,:,epoch+1) = Sw;
         TH(:,:,epoch)   = wghts_ep;

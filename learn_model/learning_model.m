@@ -1,19 +1,33 @@
+%{
+Relative Entropy Policy Search algorithm applied to learn the parameters
+of a linear cloth model
+- Original linear model by David Parent, modified by Adrià Luque
+- Original REPSupdate function by Adrià Colomé
+- Main code and other functions by Adrià Luque
+- Last Updated: September 2021
+%}
+
 close all; clc; clear;
 
-ExpSet = '11_Real_Cloth';
-ExpDate = '2021_07_05';
-NExp = 30;
-NTrial = 1;
-SimType = 'OL';
-minRwd = -1000;
-SizeSOM = 10;
-SizeCOM = 4;
-Ts = 0.015;
 
-e0 = 20;
-NSamples = 50;
-NEpochs = 20;
+%% Initialization
 
+% Learning options
+ExpSet = '11_Real_Cloth';   % Experiment Set
+ExpDate = '2021_07_05';     % Date of the gathered data
+NExp = 30;                  % Trajectory/Experiment number
+NTrial = 1;                 % Trial number for the same NExp
+minRwd = -1000;             % Minimum Reward (saturation)
+SizeSOM = 10;               % Mesh size of the gathered data
+SizeCOM = 4;                % Mesh size for the model to learn
+Ts = 0.015;                 % Time step
+
+e0 = 20;                    % Initial epoch
+NSamples = 50;              % Samples per epoch
+NEpochs = 20;               % Epochs to execute and save
+UseLambda = 1;              % Increase exploration (Variance)
+
+% Plotting options
 Plot3DTraj = 0;
 Plot2DTraj = 1;
 
@@ -41,9 +55,12 @@ theta.z_sum = 0.0312;
 %}
 
 
+% Mask to make all parameters be on the same range
 ThMask = [100 100 100 1 1 1 0.01]';
-dirname = ['Exps',ExpSet,'/Exp',num2str(NExp),'_',num2str(NTrial),'_',num2str(Ts*1000),'ms'];
-UseLambda = 1;
+
+% Directory to save/load experiments
+dirname = ['Exps',ExpSet,'/Exp',num2str(NExp),'_',num2str(NTrial), ...
+                                              '_',num2str(Ts*1000),'ms'];
 if e0==0
     % Initial seed for different sample times
     if (SizeCOM == 4 && Ts == 0.010)
@@ -85,6 +102,7 @@ if e0==0
         
     end
 else
+    % Load previous set of data (continue experiment)
     prevrange = [num2str(e0-NEpochs),'-',num2str(e0)];
 
     MWans = load([dirname,'/MW_',prevrange,'.mat']);
@@ -101,6 +119,7 @@ else
     THprev = THans(:,:,end);
 end
 
+% Initialize storage variables
 NParams = length(mw0);
 
 MW = zeros(NParams,1,NEpochs+1);
@@ -112,6 +131,8 @@ XR = cell(1,NSamples,NEpochs);
 MW(:,:,1) = mw0;
 SW(:,:,1) = Sw0;
 
+
+%% Main Learning Loop
 mw = mw0;
 Sw = Sw0;
 epoch = 1;
@@ -126,19 +147,21 @@ while epoch <= NEpochs
         
         fprintf(['\nEpoch ', num2str(e0+epoch), ' - Sample: ' num2str(i),'\n']);
         
+        % Encourage exploration increasing variance
         lambda = mean(svd(Sw))/5;
         SwL = Sw + UseLambda*eye(NParams)*lambda;
-        %SwL(7,7) = Sw(7,7)*1.1;
         
+        % Discard samples with wrong sign
         thetai = mvnrnd(mw, SwL)';
         while any(thetai(1:6)>0) || thetai(7) < 0
             thetai = mvnrnd(mw, SwL)';
         end
 
+        % Build as struct, apply mask
         theta = struct();
-        theta.stiffness = thetai(1:3)'*100;
-        theta.damping = thetai(4:6)';
-        theta.z_sum = thetai(7)/100;
+        theta.stiffness = thetai(1:3)'.*ThMask(1:3)';
+        theta.damping = thetai(4:6)'.*ThMask(4:6)';
+        theta.z_sum = thetai(7).*ThMask(7)';
 
         fprintf([' Theta: [',num2str(thetai'.*ThMask',5),']\n']);
         
@@ -149,17 +172,22 @@ while epoch <= NEpochs
         %[Rwd, AllSt] = sim_ol_theta_nlmdl_new(theta, opts);
         %[Rwd, AllSt] = sim_ol_theta_nlmdl_old(theta, opts);
         
+        % Saturate to minimum
         Rwd = max(Rwd, minRwd);
 
+        % Save results
         wghts_ep(:,i) = thetai;
         rwrds_ep(i) = Rwd;
         XR{1,i,epoch} = AllSt;
     end
     
+    % Repeat epoch if no successful results (above saturation)
     if isequal(unique(rwrds_ep), minRwd)
         fprintf('\nEPOCH HAD NO SUCCESSFUL RESULTS. RE-DOING SAME EPOCH \n');
         pause(1);
+        
     else
+        % Add results of previous epoch to obtain relative weights
         if epoch==1
             if e0==0
                 dw = REPSupdate([rwrds_ep, rwrds_ep]);
@@ -173,14 +201,16 @@ while epoch <= NEpochs
             weights2 = [wghts_ep TH(:,:,epoch-1)];
         end
         
-        Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
+        % Update weights
         mw = sum(weights2'.*dw)'/sum(dw);
+        Z = (sum(dw)*sum(dw) - sum(dw .^ 2))/sum(dw);
         summ = 0;
         for ak = 1:size(weights2,2)
             summ = summ + dw(ak)*((weights2(:,ak)-mw)*(weights2(:,ak)-mw)');%/sum(dw);
         end
         Sw = summ./(Z+1e-9);
 
+        % Save epoch results
         MW(:,:,epoch+1) = mw;
         SW(:,:,epoch+1) = Sw;
         TH(:,:,epoch)   = wghts_ep;
@@ -232,10 +262,9 @@ for epoch=1:size(MW2D,2)
     theta.damping = MW2D_Thi(4:6);
     theta.z_sum = MW2D_Thi(7);
     
-    [Rwd, AllSt] = simulation_ol_theta_v3(theta, opts);
-    %[Rwd, AllSt] = simulation_ol_theta_v2(theta, opts);
-    %[Rwd, AllSt] = simulation_ol_theta_v1(theta, opts);
-    %[Rwd, AllSt] = simulation_cl_theta(theta, opts);
+    [Rwd, AllSt] = sim_ol_theta_realcloth(theta, opts);
+    %[Rwd, AllSt] = sim_ol_theta_nlmdl_new(theta, opts);
+    %[Rwd, AllSt] = sim_ol_theta_nlmdl_old(theta, opts);
     RWMW(epoch) = Rwd;
 end
 ThLearnt = (MW2D(:,end).*ThMask)';
@@ -367,7 +396,7 @@ Tbl_Exp_id = (categorical(DataTable.ExpSetName) == ExpSet) & ...
              (DataTable.NExp == NExp) & (DataTable.NTrial == NTrial) & ...
              (DataTable.Ts == Ts) & (DataTable.NEpochs == NEpochs) & ...
              (DataTable.NSamples == NSamples) & (DataTable.MinRwd == minRwd) & ...
-             (categorical(DataTable.Simulation) == SimType);
+             (categorical(DataTable.Simulation) == 'OL');
 Tbl_Exp = DataTable(Tbl_Exp_id, :);
 
 if (size(Tbl_Exp,1) > 1)
@@ -398,7 +427,7 @@ else
     DataTable(Tbl_row,'LastEpoch') = {e0+NEpochs};
     DataTable(Tbl_row,'NEpochs') = {NEpochs};
     DataTable(Tbl_row,'NSamples') = {NSamples};
-    DataTable(Tbl_row,'Simulation') = {SimType};
+    DataTable(Tbl_row,'Simulation') = {'OL'};
     DataTable(Tbl_row,'MinRwd') = {minRwd};
     
     DataTable(Tbl_row,'Th_stiffness_x') = {ThLearnt(1)};
