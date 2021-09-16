@@ -1,15 +1,16 @@
 %{
 Closed-loop simulation of an MPC applied to cloth models
 - Original linear model by David Parent, modified by Adrià Luque
-- New NL model by Franco Coltraro
+- New nonlinear model by Franco Coltraro
 - MPC and simulation by Adrià Luque
 - Both COM and SOM are linear, a third nonlinear model simulates reality
+- Last Updated: September 2021
 %}
 clear; close all; clc;
 
 % General Parameters
-NTraj = 13;
-Ts = 0.02;
+NTraj = 10;
+Ts = 0.020;
 Hp = 20;
 Wv = 0.25;
 nSOM = 4;

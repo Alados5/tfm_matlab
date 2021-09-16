@@ -1,14 +1,15 @@
 %{
 Closed-loop simulation of an MPC applied to a nonlinear cloth model
 - Original linear model by David Parent, modified by Adrià Luque
-- New NL model by Franco Coltraro
+- New nonlinear model by Franco Coltraro
 - MPC and simulation by Adrià Luque
+- Last Updated: September 2021
 %}
 clear; close all; clc;
 
 % General Parameters
 NTraj = 10;
-Ts = 0.02;
+Ts = 0.020;
 Hp = 25;
 nSOM = 7;
 nCOM = 4;
@@ -18,15 +19,16 @@ TCPOffset_local = [0; 0; 0.09];
 % Opti parameters
 ubound = 50*1e-3; %5*1e-3
 gbound = 0; % (Eq. Constraint)
-W_Q = 0.001;
+W_Q = 0.05;
 W_R = 1.00;
 opt_du  = 1;
 opt_Qa  = 0;
 opt_sto = 0;
+opt_noise = 0;
 
 % Noise parameters
-sigmaD = 0*0.003; % m/s
-sigmaN = 0*0.001; % m
+sigmaD = opt_noise*0.003; % m/s
+sigmaN = opt_noise*0.001; % m
 
 % Plotting options
 plotAnim = 0;

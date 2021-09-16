@@ -2,13 +2,14 @@
 Closed-loop simulation of an MPC applied to a linear cloth model
 - Original linear model by David Parent, modified by Adrià Luque
 - MPC and simulation by Adrià Luque
+- Last Updated: September 2021
 %}
 clear; close all; clc;
 
 % General Parameters
-NTraj = 16;
-Ts = 0.015;
-Hp = 30;
+NTraj = 10;
+Ts = 0.020;
+Hp = 25;
 nSOM = 4;
 nCOM = 4;
 TCPOffset_local = [0; 0; 0.09];
@@ -17,7 +18,7 @@ TCPOffset_local = [0; 0; 0.09];
 ubound = 50*1e-3;
 gbound = 0; % (Eq. Constraint)
 W_Q = 1;
-W_R = 0.1755;
+W_R = 0.2;
 opt_du  = 1;
 opt_Qa  = 0;
 opt_sto = 0;
@@ -217,13 +218,12 @@ for k = 1:Hp
     end
 end
 
-
+% Encapsulate in controller object
 opt_prob = struct('f', objfun, 'x', w, 'g', g, 'p', P);
 opt_config = struct;
 opt_config.print_time = 0;
 opt_config.ipopt.print_level = 0; %0 min print - 3 max
 opt_config.ipopt.warm_start_init_point = 'yes'; %warm start
-
 controller = nlpsol('ctrl_sol', 'ipopt', opt_prob, opt_config);
 
 
@@ -270,6 +270,7 @@ store_u(:,1) = zeros(6,1);
 store_pose(1) = struct('position', tcp_ini, ...
                        'orientation', rotm2quat(Rtcp));
 
+% Start timers and main loop
 tT0 = tic;
 t0 = tic;
 printX = 100;
@@ -284,18 +285,18 @@ for tk=2:nPtRef
         Ref_r_Hp = Ref_r(tk:tk+Hp,:);
     end
     
-    % Rotate initial position to cloth base
+    % Rotate initial position to cloth base (R^T = R^-1)
     pos_ini_COM = reshape(x_ini_COM(1:3*nxC*nyC),[nxC*nyC,3]);
     vel_ini_COM = reshape(x_ini_COM(3*nxC*nyC+1:6*nxC*nyC),[nxC*nyC,3]);
     
-    pos_ini_COM_rot = (Rcloth^-1 * pos_ini_COM')';
-    vel_ini_COM_rot = (Rcloth^-1 * vel_ini_COM')';
+    pos_ini_COM_rot = (Rcloth' * pos_ini_COM')';
+    vel_ini_COM_rot = (Rcloth' * vel_ini_COM')';
     x_ini_COM_rot = [reshape(pos_ini_COM_rot,[3*nxC*nyC,1]);
                      reshape(vel_ini_COM_rot,[3*nxC*nyC,1])];
                  
     % Rotate reference trajectory to cloth base
-    Ref_l_Hp_rot = (Rcloth^-1 * Ref_l_Hp')';
-    Ref_r_Hp_rot = (Rcloth^-1 * Ref_r_Hp')';
+    Ref_l_Hp_rot = (Rcloth' * Ref_l_Hp')';
+    Ref_r_Hp_rot = (Rcloth' * Ref_r_Hp')';
     
     % Define input parameters for the optimizer (sliding window)
     in_params(1,:) = x_ini_COM_rot';
@@ -332,8 +333,8 @@ for tk=2:nPtRef
     % Linear SOM uses local variables too (rot)  
     pos_ini_SOM = reshape(store_state(1:3*nxS*nyS,tk-1), [nxS*nyS,3]);
     vel_ini_SOM = reshape(store_state(3*nxS*nyS+1:6*nxS*nyS,tk-1), [nxS*nyS,3]);
-    pos_ini_SOM_rot = (Rcloth^-1 * pos_ini_SOM')';
-    vel_ini_SOM_rot = (Rcloth^-1 * vel_ini_SOM')';
+    pos_ini_SOM_rot = (Rcloth' * pos_ini_SOM')';
+    vel_ini_SOM_rot = (Rcloth' * vel_ini_SOM')';
     x_ini_SOM_rot = [reshape(pos_ini_SOM_rot,[3*nxS*nyS,1]);
                      reshape(vel_ini_SOM_rot,[3*nxS*nyS,1])];
     
