@@ -1,2 +1,3 @@
 required_files/casadi-toolbox-windows/** linguist-vendored
+required_files/casadi-toolbox-windows/casadi/jit/mingw/** linguist-vendored
 required_files/casadi-toolbox-mac/** linguist-vendored
