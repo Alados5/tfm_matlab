@@ -1,1 +1,2 @@
-required_files/casadi-toolbox-* linguist-vendored
+required_files/casadi-toolbox-windows/* linguist-vendored
+required_files/casadi-toolbox-mac/* linguist-vendored
