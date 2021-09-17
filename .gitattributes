@@ -1,2 +1,2 @@
-required_files/casadi-toolbox-windows/* linguist-vendored
-*.h linguist-detectable=false
+required_files/casadi-toolbox-windows/** linguist-vendored
+required_files/casadi-toolbox-mac/** linguist-vendored
