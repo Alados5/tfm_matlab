@@ -3,8 +3,9 @@ function [mat_x,mat_y,mat_z] = compute_l0_linear(param,is_optimization)
 % looks if there is a link for each type of connection and computes the
 % initial length.
 %
-% Author: David Parent, davidparentalonso@gmail.com
-% Last review: 07/02/2021
+% - Original Author: David Parent, davidparentalonso@gmail.com
+% - Modified by: Adrià Luque, adria.alados@gmail.com
+% - Last review: September 2021
 
 import casadi.*
 

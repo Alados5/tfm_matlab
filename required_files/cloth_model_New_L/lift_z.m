@@ -1,8 +1,9 @@
 function out_ = lift_z(in_,param)
 % It displaces the nodes in the vertical direction (z) a given distance.
 %
-% Author: David Parent, davidparentalonso@gmail.com
-% Last review: 01/02/2021
+% - Original Author: David Parent, davidparentalonso@gmail.com
+% - Revised by: Adrià Luque, adria.alados@gmail.com
+% - Last review: September 2021
 
 i=0;
 nx = param.row;

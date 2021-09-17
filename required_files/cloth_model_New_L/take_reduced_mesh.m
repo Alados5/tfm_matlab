@@ -1,6 +1,9 @@
 function [phi1,dphi1] = take_reduced_mesh(phi_big,dphi_big, N,n)     
 % Extract a n-by-n mesh from a N-by-N mesh.
-
+%
+% - Original Author: David Parent, davidparentalonso@gmail.com
+% - Modified by: Adrià Luque, adria.alados@gmail.com
+% - Last review: September 2021
 
 if nargin < 4
     n = 4;

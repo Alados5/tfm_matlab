@@ -1,6 +1,10 @@
 function [A, B, f_ext] = create_model_linear_matrices(param)
 % Creates the matrices to express the system in linear state space:
 % x(k+1) = A*x(k) + B*u(k) + f_ext
+%
+% - Original Author: David Parent, davidparentalonso@gmail.com
+% - Modified by: Adrià Luque, adria.alados@gmail.com
+% - Last review: September 2021
 
 k = param.stiffness;
 b = param.damping;
